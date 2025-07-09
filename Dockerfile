@@ -55,4 +55,7 @@ EXPOSE 3000
 
 ENV NODE_ENV=production
 
-ENTRYPOINT ["pnpm", "db:deploy", "&&", "pnpm", "start"]
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
+CMD ["/app/docker-entrypoint.sh"]
