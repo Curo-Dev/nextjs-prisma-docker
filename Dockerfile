@@ -43,19 +43,20 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
 
+# Copy entrypoint script
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Change ownership of the app directory
+# Make entrypoint script executable and change ownership
+RUN chmod +x /app/docker-entrypoint.sh
 RUN chown -R nextjs:nodejs /app
 USER nextjs
 
 EXPOSE 3000
 
 ENV NODE_ENV=production
-
-COPY docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
 
 CMD ["/app/docker-entrypoint.sh"]
