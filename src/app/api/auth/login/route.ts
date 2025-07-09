@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import prisma from '@/lib/prisma';
+import { generateToken } from '@/lib/jwt';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,12 +37,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Return success response (without password)
+    // Generate JWT token
+    const token = generateToken({
+      userId: user.id,
+      email: user.email
+    });
+
+    // Return success response with token (without password)
     const { password: _, ...userWithoutPassword } = user;
     
     return NextResponse.json({
       message: '로그인 성공',
-      user: userWithoutPassword
+      user: userWithoutPassword,
+      accessToken: token
     });
 
   } catch (error) {

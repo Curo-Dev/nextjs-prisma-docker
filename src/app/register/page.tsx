@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function RegisterPage() {
     const [email, setEmail] = useState('');
@@ -10,6 +11,26 @@ export default function RegisterPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+    const { isAuthenticated, loading: authLoading } = useAuth();
+
+    // 이미 로그인된 사용자는 홈페이지로 리다이렉트
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            router.push('/');
+        }
+    }, [isAuthenticated, authLoading, router]);
+
+    if (authLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="text-lg">로딩 중...</div>
+            </div>
+        );
+    }
+
+    if (isAuthenticated) {
+        return null; // 리다이렉트 중이므로 아무것도 렌더링하지 않음
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
