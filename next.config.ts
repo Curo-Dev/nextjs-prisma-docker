@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client', 'prisma'],
   },
+  output: 'standalone',
 };
 
 export default nextConfig;
