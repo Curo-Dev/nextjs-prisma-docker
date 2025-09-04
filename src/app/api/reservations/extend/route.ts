@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // 현재 날짜 설정
-    const refDate = dayjs().startOf('day').toDate();
+    const refDate = dayjs.tz().startOf('day').toDate();
     
     // 연장하려는 시간대가 비어있는지 확인
     const newEndedAt = reservation.endedAt + extendHours;
@@ -136,7 +136,7 @@ export async function PATCH(request: NextRequest) {
       where: { id: reservationId },
       data: {
         endedAt: newEndedAt,
-        extendedAt: dayjs().toDate(),
+        extendedAt: dayjs.tz().toDate(),
         extendedCount: reservation.extendedCount + 1,
       },
       include: {

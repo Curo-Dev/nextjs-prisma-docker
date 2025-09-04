@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 현재 날짜를 refDate로 설정 (오늘 날짜)
-    const refDate = dayjs().startOf('day').toDate();
+    const refDate = dayjs.tz().startOf('day').toDate();
 
     // 해당 유저가 오늘 이미 예약이 있는지 확인 (하루 1회 제한)
     // CANCELLED 상태를 제외한 모든 예약 포함
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
     const seatId = searchParams.get('seatId');
     
     // 현재 날짜를 refDate로 설정 (오늘 날짜)
-    const refDate = dayjs().startOf('day').toDate();
+    const refDate = dayjs.tz().startOf('day').toDate();
 
     if (seatId) {
       // 특정 좌석의 예약 시간대 조회 (ACTIVE 상태 + 당일 퇴실한 EXPIRED 예약)

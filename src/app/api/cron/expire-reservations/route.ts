@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const now = dayjs();
+    const now = dayjs.tz();
     const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0');
     const currentHour = now.hour() + timeOffset; // UTC+9 (한국시간) + 개발용 오프셋
     const today = now.startOf('day').toDate();

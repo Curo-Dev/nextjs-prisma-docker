@@ -51,9 +51,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: '본인의 예약만 퇴실할 수 있습니다.' }, { status: 403 });
     }
 
-    const now = dayjs(); // 실제 서버 시간 (로그/저장용)
+    const now = dayjs.tz(); // 한국 시간 (로그/저장용)
     const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0'); // 개발 편의용
-    const currentTime = dayjs().add(timeOffset, 'hour'); // 비교/판단용 "현재 시간"
+    const currentTime = dayjs.tz().add(timeOffset, 'hour'); // 비교/판단용 "현재 시간"
 
     const checkoutHour = currentTime.hour();
 
