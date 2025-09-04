@@ -68,21 +68,10 @@ export async function PATCH(request: NextRequest) {
     const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0');
     const currentHour = now.hour() + timeOffset; // UTC+9 + 개발용 오프셋
     
-    // 이미 종료된 예약인지 확인
-    if (currentHour > reservation.endedAt) {
-      return NextResponse.json(
-        { error: '이미 종료된 예약입니다.' },
-        { status: 400 }
-      );
-    }
+    console.log('Current hour:', currentHour, 'Reservation startedAt:', reservation.startedAt, 'endedAt:', reservation.endedAt);
 
-    // 예약 시작 시간 이전에는 퇴실할 수 없음
-    if (currentHour < reservation.startedAt) {
-      return NextResponse.json(
-        { error: '예약 시작 시간 이전에는 퇴실할 수 없습니다.' },
-        { status: 400 }
-      );
-    }
+    // 퇴실의 경우는 예약 시간이 지났더라도 퇴실은 가능하도록 허용
+    // 단, 예약 시작 시간 이전에는 퇴실할 수 없음 (위에서 이미 체크됨)
 
     // 퇴실 시 endedAt을 현재 시간으로 설정
     // 예: 9시 예약(9:00-9:59)하고 9:15분에 퇴실 → endedAt = 9 (9시대 사용됨)
