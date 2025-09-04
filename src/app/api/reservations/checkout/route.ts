@@ -58,6 +58,10 @@ export async function PATCH(request: NextRequest) {
     const checkoutHour = currentTime.hour();
 
     // 새로운 로직: 예약 시작 시간 기준으로 판단
+
+    // 12 >= 12 && 12 <= 15
+
+    console.log(checkoutHour, reservation.startedAt, reservation.endedAt);
     if (checkoutHour >= reservation.startedAt && checkoutHour <= reservation.endedAt) {
       // 케이스 1: 예약 시간 내에 퇴실 (예: 9시-11시 예약, 9시 20분 퇴실)
       // → endedAt을 현재 시간(9)으로 변경, 나머지 시간(10시, 11시) 해제
