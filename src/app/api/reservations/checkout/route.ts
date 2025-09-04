@@ -56,9 +56,10 @@ export async function PATCH(request: NextRequest) {
     const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0'); // 개발 편의용
     const currentTime = dayjs().add(timeOffset, 'hour'); // 비교/판단용 "현재 시간"
 
-    const reservationDate = dayjs(reservation.refDate);
-    const reservationStart = reservationDate.hour(reservation.startedAt).startOf('hour');
-    const reservationEnd   = reservationDate.hour(reservation.endedAt).endOf('hour');
+    // 퇴실 처리 시점의 현재 날짜를 기준으로 예약 시간 계산
+    const currentDate = dayjs().startOf('day');
+    const reservationStart = currentDate.hour(reservation.startedAt).startOf('hour');
+    const reservationEnd   = currentDate.hour(reservation.endedAt).endOf('hour');
 
     const isFutureReservation  = currentTime.isBefore(reservationStart);
     const isExpiredReservation = currentTime.isAfter(reservationEnd);
