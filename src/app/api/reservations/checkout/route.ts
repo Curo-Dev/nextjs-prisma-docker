@@ -106,12 +106,28 @@ export async function PATCH(request: NextRequest) {
       });
     } else if (isExpiredReservation) {
       // 이미 종료된 예약을 퇴실하는 경우: EXPIRED로 변경하고 원래 종료 시간 유지
+      // 단, checkoutAt이 예약 시간 내에 있다면 endedAt을 checkoutAt 시간으로 수정
+      const updateData: {
+        checkoutAt: Date;
+        status: 'EXPIRED';
+        endedAt?: number;
+      } = {
+        checkoutAt: now.toDate(),
+        status: 'EXPIRED',
+      };
+      
+      // checkoutAt이 예약 시간 내에 있는지 확인
+      const checkoutTime = dayjs(reservation.checkoutAt || now.toDate());
+      const checkoutHour = checkoutTime.hour();
+      
+      if (checkoutHour >= reservation.startedAt && checkoutHour <= reservation.endedAt) {
+        // 예약 시간 내에 퇴실한 경우 endedAt을 퇴실 시간으로 수정
+        updateData.endedAt = checkoutHour;
+      }
+      
       const updatedReservation = await prisma.reservation.update({
         where: { id: reservationId },
-        data: {
-          checkoutAt: now.toDate(),
-          status: 'EXPIRED',
-        },
+        data: updateData,
         include: {
           user: {
             select: {

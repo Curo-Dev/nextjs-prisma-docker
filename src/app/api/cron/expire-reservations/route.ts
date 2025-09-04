@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
     const now = dayjs();
     const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0');
-    const currentHour = now.hour() + 9 + timeOffset; // UTC+9 (한국시간) + 개발용 오프셋
+    const currentHour = now.hour() + timeOffset; // UTC+9 (한국시간) + 개발용 오프셋
     const today = now.startOf('day').toDate();
 
     console.log(`[Cron] 예약 만료 처리 시작 - 현재 시간: ${currentHour}시`);
