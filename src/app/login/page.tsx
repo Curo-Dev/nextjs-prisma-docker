@@ -56,7 +56,7 @@ export default function LoginPage() {
             login(data.accessToken, data.user);
             alert('로그인 성공!');
             router.push('/'); // Redirect to home page
-        } catch (err) {
+        } catch {
             setError('서버 오류가 발생했습니다.');
         } finally {
             setLoading(false);

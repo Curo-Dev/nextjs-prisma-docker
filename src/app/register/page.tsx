@@ -63,7 +63,7 @@ export default function RegisterPage() {
             // Registration successful
             alert('회원가입 성공! 로그인 페이지로 이동합니다.');
             router.push('/login');
-        } catch (err) {
+        } catch {
             setError('서버 오류가 발생했습니다.');
         } finally {
             setLoading(false);

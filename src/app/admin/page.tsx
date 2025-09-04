@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 
 interface User {
   id: string;
@@ -69,7 +70,7 @@ export default function AdminPage() {
       const data = await response.json();
       setUsers(data.users || []);
       
-    } catch (err) {
+    } catch {
       setLoginError('서버 오류가 발생했습니다.');
     } finally {
       setLoginLoading(false);
@@ -94,7 +95,7 @@ export default function AdminPage() {
         const data = await response.json();
         setUsers(data.users || []);
       }
-    } catch (err) {
+    } catch(err) {
       console.error('사용자 목록 조회 실패:', err);
     } finally {
       setUsersLoading(false);
@@ -133,7 +134,7 @@ export default function AdminPage() {
       alert('학번이 추가되었습니다.');
       await fetchUsers();
       
-    } catch (err) {
+    } catch {
       setAddUserError('서버 오류가 발생했습니다.');
     } finally {
       setAddUserLoading(false);
@@ -171,7 +172,7 @@ export default function AdminPage() {
       alert('학번이 삭제되었습니다.');
       await fetchUsers();
       
-    } catch (err) {
+    } catch {
       alert('서버 오류가 발생했습니다.');
     } finally {
       setDeletingUserId(null);
@@ -242,12 +243,12 @@ export default function AdminPage() {
             </div>
 
             <div className="text-center">
-              <a
+              <Link
                 href="/"
                 className="font-medium text-indigo-600 hover:text-indigo-500"
               >
                 메인 페이지로 돌아가기
-              </a>
+              </Link>
             </div>
           </form>
         </div>
