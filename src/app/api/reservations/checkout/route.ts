@@ -103,33 +103,57 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
-    // 3) 현재 진행 중인 예약 → EXPIRED + endedAt을 "현재 시(hour)로 내림"
+    // 3) 현재 진행 중인 예약
     if (isCurrentReservation) {
-      // 예: 09:20에 퇴실하면 endedAt=9 → 10·11시는 해제
       const checkoutHour = currentTime.hour();
-      const clippedEndedAt = Math.max(reservation.startedAt, Math.min(checkoutHour, reservation.endedAt));
 
-      const updated = await prisma.reservation.update({
-        where: { id: reservationId },
-        data: {
-          endedAt: clippedEndedAt,
-          checkoutAt: now.toDate(),
-          status: 'EXPIRED',
-        },
-        include: { user: { select: { studentId: true } } }
-      });
+      // 퇴실 시간이 예약 시작 시간과 같은 시간대인지 확인
+      if (checkoutHour >= reservation.startedAt) {
+        // 같은 시간대에 퇴실: endedAt을 현재 시간으로 설정 (부분 사용)
+        const updated = await prisma.reservation.update({
+          where: { id: reservationId },
+          data: {
+            endedAt: checkoutHour,
+            checkoutAt: now.toDate(),
+            status: 'EXPIRED',
+          },
+          include: { user: { select: { studentId: true } } }
+        });
 
-      return NextResponse.json({
-        message: '성공적으로 퇴실되었습니다.',
-        reservation: {
-          id: updated.id,
-          seatId: updated.seat_id,
-          startedAt: updated.startedAt,
-          endedAt: updated.endedAt,    // ex) 9로 저장
-          checkoutAt: updated.checkoutAt,
-          studentId: updated.user.studentId
-        }
-      });
+        return NextResponse.json({
+          message: '성공적으로 퇴실되었습니다.',
+          reservation: {
+            id: updated.id,
+            seatId: updated.seat_id,
+            startedAt: updated.startedAt,
+            endedAt: updated.endedAt,    // ex) 9시 20분 퇴실 → endedAt=9
+            checkoutAt: updated.checkoutAt,
+            studentId: updated.user.studentId
+          }
+        });
+      } else {
+        // 퇴실 시간이 예약 시작 시간보다 이전: 취소 처리
+        const updated = await prisma.reservation.update({
+          where: { id: reservationId },
+          data: {
+            checkoutAt: now.toDate(),
+            status: 'CANCELLED',
+          },
+          include: { user: { select: { studentId: true } } }
+        });
+
+        return NextResponse.json({
+          message: '예약 시간이 시작되기 전에 퇴실하여 예약이 취소되었습니다.',
+          reservation: {
+            id: updated.id,
+            seatId: updated.seat_id,
+            startedAt: updated.startedAt,
+            endedAt: updated.endedAt,    // 원래 종료 시간 유지
+            checkoutAt: updated.checkoutAt,
+            studentId: updated.user.studentId
+          }
+        });
+      }
     }
 
     // 이외(이론상 도달 X) 안전망: EXPIRED 처리
