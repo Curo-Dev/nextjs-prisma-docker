@@ -4,12 +4,5 @@
       "path": "/api/cron/expire-reservations",
       "schedule": "0 * * * *"
     }
-  ],
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "maxDuration": 30
-    }
-  },
-  "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  ]
 }
