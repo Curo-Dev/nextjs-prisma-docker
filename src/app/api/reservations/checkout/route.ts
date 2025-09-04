@@ -52,7 +52,6 @@ export async function PATCH(request: NextRequest) {
 
     const isFutureReservation  = currentTime.isBefore(reservationStart);
     const isExpiredReservation = currentTime.isAfter(reservationEnd);
-    const isCurrentReservation = currentTime.isSameOrAfter(reservationStart) && currentTime.isBefore(reservationEnd);
 
     // 1) 미래 예약 → 취소
     if (isFutureReservation) {
@@ -104,7 +103,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // 3) 현재 진행 중인 예약
-    if (isCurrentReservation) {
+
       const checkoutHour = currentTime.hour();
 
       // 퇴실 시간이 예약 시작 시간과 같은 시간대인지 확인
@@ -154,29 +153,6 @@ export async function PATCH(request: NextRequest) {
           }
         });
       }
-    }
-
-    // 이외(이론상 도달 X) 안전망: EXPIRED 처리
-    const updated = await prisma.reservation.update({
-      where: { id: reservationId },
-      data: {
-        checkoutAt: now.toDate(),
-        status: 'EXPIRED',
-      },
-      include: { user: { select: { studentId: true } } }
-    });
-
-    return NextResponse.json({
-      message: '성공적으로 퇴실되었습니다.',
-      reservation: {
-        id: updated.id,
-        seatId: updated.seat_id,
-        startedAt: updated.startedAt,
-        endedAt: updated.endedAt,
-        checkoutAt: updated.checkoutAt,
-        studentId: updated.user.studentId
-      }
-    });
 
   } catch (error) {
     console.error('Checkout error:', error);
