@@ -6,6 +6,16 @@ import dayjs from 'dayjs';
 import isSameOrAfter from "dayjs/plugin/isSameOrAfter";
 dayjs.extend(isSameOrAfter);
 
+import timezone from "dayjs/plugin/timezone";
+dayjs.extend(timezone);
+
+import utc from "dayjs/plugin/utc";
+dayjs.extend(utc);
+
+dayjs.extend(timezone);
+
+dayjs.tz.setDefault("Asia/Seoul");
+
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
@@ -65,7 +75,7 @@ export async function PATCH(request: NextRequest) {
       });
 
       return NextResponse.json({
-        message: '성공적으로 예약이 취소되었습니다.',
+        message: '성공적으로 예약이 취소되었습니다. 1',
         reservation: {
           id: updated.id,
           seatId: updated.seat_id,
@@ -90,7 +100,7 @@ export async function PATCH(request: NextRequest) {
       });
 
       return NextResponse.json({
-        message: '성공적으로 퇴실되었습니다.',
+        message: '성공적으로 퇴실되었습니다. 2',
         reservation: {
           id: updated.id,
           seatId: updated.seat_id,
