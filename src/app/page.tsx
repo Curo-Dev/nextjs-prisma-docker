@@ -595,19 +595,33 @@ export default function Home() {
       </TabsContent>
       <TabsContent
         value="tab2"
-        className="space-y-2 text-sm leading-7 text-gray-600 dark:text-gray-500"
+        className=""
       >
-        <p>
-          You have 60 days from the time we&apos;ve shipped your order to return any
-          part of it to us for a refund, provided it is still in its original,
-          unused condition: we do not accept returns of used items.
-        </p>
-        <p>
-          No return authorization (RMA) is required. If you are within the
-          United States, a pre-paid shipping label will be generated. For direct
-          returns, a flat fee of $10 is deducted from your return for shipping
-          and processing costs.
-        </p>
+        <div className="grid grid-cols-2 grid-rows-3 max-w-lg mx-auto gap-2">
+          {Array.from({length: 5}).map((x, i) =>{
+              const 고정석 = [
+                1
+              ]
+              const text = 고정석.find((y) => y == i + 1) ? "고정석" : i + 13
+            return (
+            <button key={i} className={`aspect-square flex justify-center items-center transition-colors ${
+              selectedSeat === i + 13 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
+            }`}
+            onClick={() => {
+              if(text == "고정석") {
+                return;
+              }
+              setSelectedSeat(i + 13);
+              setSelectedTimes([]);
+              setReservationForm({ studentId: '', password: '' });
+              setReservedTimeSlots([]);
+              setReservationDetails({});
+              setSeatReservations([]);
+              fetchSeatReservations(i + 13);
+            }}
+            >{text}</button>
+          )})}
+        </div>
       </TabsContent>
     </div>
   </Tabs>
