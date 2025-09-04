@@ -70,8 +70,11 @@ export async function PATCH(request: NextRequest) {
     
     console.log('Current hour:', currentHour, 'Reservation startedAt:', reservation.startedAt, 'endedAt:', reservation.endedAt);
 
-    // 미래 예약을 미리 퇴실하는지 확인
+    // 미래 예약을 미리 퇴실하는지 확인 (예약 시작 시간 이전)
     const isFutureReservation = currentHour < reservation.startedAt;
+    
+    // 이미 종료된 예약인지 확인 (예약 종료 시간 이후)
+    const isExpiredReservation = currentHour > reservation.endedAt;
     
     if (isFutureReservation) {
       // 미래 예약을 미리 퇴실하는 경우: CANCELLED로 변경하여 다른 사람이 예약할 수 있도록 함
@@ -101,8 +104,36 @@ export async function PATCH(request: NextRequest) {
           studentId: updatedReservation.user.studentId
         }
       });
+    } else if (isExpiredReservation) {
+      // 이미 종료된 예약을 퇴실하는 경우: EXPIRED로 변경하고 원래 종료 시간 유지
+      const updatedReservation = await prisma.reservation.update({
+        where: { id: reservationId },
+        data: {
+          checkoutAt: now.toDate(),
+          status: 'EXPIRED',
+        },
+        include: {
+          user: {
+            select: {
+              studentId: true
+            }
+          }
+        }
+      });
+
+      return NextResponse.json({
+        message: '성공적으로 퇴실되었습니다.',
+        reservation: {
+          id: updatedReservation.id,
+          seatId: updatedReservation.seat_id,
+          startedAt: updatedReservation.startedAt,
+          endedAt: updatedReservation.endedAt,
+          checkoutAt: updatedReservation.checkoutAt,
+          studentId: updatedReservation.user.studentId
+        }
+      });
     } else {
-      // 현재 시간대나 과거 예약을 퇴실하는 경우: EXPIRED로 변경하고 실제 사용 시간만큼만 차지
+      // 현재 진행 중인 예약을 퇴실하는 경우: EXPIRED로 변경하고 실제 사용 시간만큼만 차지
       const checkoutEndedAt = currentHour;
       const updatedReservation = await prisma.reservation.update({
         where: { id: reservationId },
