@@ -536,7 +536,8 @@ export default function Home() {
             return (
             <button key={i} className={`aspect-square flex justify-center items-center transition-colors ${i > 1 && "row-start-2"} ${
               selectedSeat === i + 1 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
-            }`} onClick={() => {
+            }`}
+            onClick={() => {
               setSelectedSeat(i + 1);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
@@ -544,7 +545,8 @@ export default function Home() {
               setReservationDetails({});
               setSeatReservations([]);
               fetchSeatReservations(i + 1);
-            }}>{i + 1}</button>
+            }}
+            >{i + 1}</button>
           )})}
           {Array.from({length: 4}).map((x, i) =>{
             const 고정석 = [
@@ -552,7 +554,21 @@ export default function Home() {
             ]
             const text = 고정석.find((y) => y == i + 1) ? "고정석" : i + 5
             return (
-            <button key={i} className={`aspect-square flex justify-center items-center col-start-4 bg-gray-50 ${((i + 1) % 2) == 0 && "col-start-5"}`}>{text}</button>
+            <button key={i} className={`aspect-square flex justify-center items-center col-start-4 bg-gray-50 ${((i + 1) % 2) == 0 && "col-start-5"}  ${
+              selectedSeat === i + 5 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
+            }`}
+            onClick={() => {
+              if(text == "고정석") {
+                return;
+              }
+              setSelectedSeat(i + 5);
+              setSelectedTimes([]);
+              setReservationForm({ studentId: '', password: '' });
+              setReservedTimeSlots([]);
+              setReservationDetails({});
+              setSeatReservations([]);
+              fetchSeatReservations(i + 5);
+            }}>{text}</button>
           )})}
            {Array.from({length: 5}).map((x, i) =>{
              const 고정석 = [
@@ -560,7 +576,20 @@ export default function Home() {
             ]
             const text = 고정석.find((y) => y == i + 1) ? "고정석" : i + 9
             return (
-            <button key={i} className={`aspect-square flex justify-center items-center bg-gray-50 row-start-4`}>{text}</button>
+            <button key={i} className={`aspect-square flex justify-center items-center bg-gray-50 row-start-4 ${
+              selectedSeat === i + 9 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
+            }`} onClick={() => {
+              if(text == "고정석") {
+                return;
+              }
+              setSelectedSeat(i + 9);
+              setSelectedTimes([]);
+              setReservationForm({ studentId: '', password: '' });
+              setReservedTimeSlots([]);
+              setReservationDetails({});
+              setSeatReservations([]);
+              fetchSeatReservations(i + 9);
+            }}>{text}</button>
           )})}
         </div>
       </TabsContent>
