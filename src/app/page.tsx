@@ -717,12 +717,8 @@ export default function Home() {
                   
                   // 약간의 지연 후 최신 데이터로 현재 예약 찾기
                   setTimeout(() => {
-                    const now = dayjs()
-                    const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
-                    const currentHour = now.hour() + timeOffset;
                     const currentReservation = seatReservations.find(reservation => 
-                      !reservation.checkoutAt && 
-                      currentHour >= reservation.startedAt && currentHour <= reservation.endedAt
+                      !reservation.checkoutAt
                     );
                     
                     if (currentReservation) {

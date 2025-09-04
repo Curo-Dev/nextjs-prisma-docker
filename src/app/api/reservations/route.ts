@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 같은 날짜, 같은 좌석의 모든 관련 예약 조회 (ACTIVE + 퇴실한 EXPIRED)
+    // 같은 날짜, 같은 좌석의 모든 관련 예약 조회 (ACTIVE + 퇴실한 EXPIRED, CANCELLED 제외)
     const existingReservations = await prisma.reservation.findMany({
       where: {
         seat_id: parseInt(seatId),
