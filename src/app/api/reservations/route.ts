@@ -184,6 +184,7 @@ export async function GET(request: NextRequest) {
           extendedCount: true,
           checkoutAt: true,
           status: true,
+          refDate: true,
           user: {
             select: {
               studentId: true
@@ -202,10 +203,23 @@ export async function GET(request: NextRequest) {
         
         // 퇴실한 예약의 경우 실제 사용 시간만 계산
         if (reservation.checkoutAt && reservation.status === 'EXPIRED') {
-          const checkoutTime = dayjs(reservation.checkoutAt).add(9, 'hour');
+          const checkoutTime = dayjs(reservation.checkoutAt);
           const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0');
-          const checkoutHour = checkoutTime.hour() + timeOffset;
-          actualEndedAt = checkoutHour;
+          const checkoutTimeWithOffset = checkoutTime.add(timeOffset, 'hour'); // 날짜와 시간을 함께 고려
+
+          // 예약 시간을 dayjs 객체로 변환 (refDate 기준)
+          const reservationDate = dayjs(reservation.refDate);
+          const reservationStart = reservationDate.hour(reservation.startedAt).startOf('hour');
+          const reservationEnd = reservationDate.hour(reservation.endedAt).endOf('hour');
+
+          // 퇴실 시간이 예약 시간 내에 있는지 확인
+          if (checkoutTimeWithOffset.isAfter(reservationStart) && checkoutTimeWithOffset.isBefore(reservationEnd)) {
+            // 퇴실 시간이 예약 시간 내에 있으면 실제 퇴실 시간 사용
+            // 예: 9시 20분 퇴실 → 9시대 사용, endedAt = 9
+            // 예: 10시 5분 퇴실 → 10시대 사용, endedAt = 10
+            actualEndedAt = checkoutTimeWithOffset.hour();
+          }
+          // 그렇지 않으면 원래 endedAt 유지
         }
         
         for (let i = reservation.startedAt - 9; i <= actualEndedAt - 9; i++) {
