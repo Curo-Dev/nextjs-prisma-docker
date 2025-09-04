@@ -3,16 +3,46 @@ generator client {
   output          = "../node_modules/.prisma/client"
 }
 
+
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id       Int @id @default(autoincrement())
-  email    String @unique
+  id       String @id @default(cuid())
+  studentId String @unique
   password String
-
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
+  reservations Reservation[]
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  createdAt DateTime @default(now())
+}
+
+enum ReservationStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model Reservation {
+  id            String            @id @default(cuid())
+  user_id       String
+  user          User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  seat_id       Int
+  startedAt     Int
+  endedAt       Int
+  extendedAt    DateTime?
+  extendedCount Int               @default(0)
+  checkoutAt    DateTime?
+  status        ReservationStatus @default(ACTIVE)
+  createdAt     DateTime          @default(now())
+  refDate       DateTime
 }
