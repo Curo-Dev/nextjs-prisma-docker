@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       
       // 퇴실한 예약의 경우 실제 사용 시간만 검사
       if (reservation.checkoutAt && reservation.status === 'EXPIRED') {
-        const checkoutTime = dayjs(reservation.checkoutAt);
+        const checkoutTime = dayjs(reservation.checkoutAt).add(9, 'hour');
         const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0');
         const checkoutHour = checkoutTime.hour() + timeOffset;
         actualEndedAt = checkoutHour;
@@ -202,7 +202,7 @@ export async function GET(request: NextRequest) {
         
         // 퇴실한 예약의 경우 실제 사용 시간만 계산
         if (reservation.checkoutAt && reservation.status === 'EXPIRED') {
-          const checkoutTime = dayjs(reservation.checkoutAt);
+          const checkoutTime = dayjs(reservation.checkoutAt).add(9, 'hour');
           const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0');
           const checkoutHour = checkoutTime.hour() + timeOffset;
           actualEndedAt = checkoutHour;
