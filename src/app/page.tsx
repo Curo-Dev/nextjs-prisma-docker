@@ -46,7 +46,155 @@ export default function Home() {
   const [allSeatsStatus, setAllSeatsStatus] = useState<{[key: number]: 'available' | 'occupied' | 'fixed'}>({});
   const [seatRemainingTime, setSeatRemainingTime] = useState<{[key: number]: number}>({});
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [language, setLanguage] = useState<'ko' | 'en'>('ko');
   const { loading } = useAuth();
+
+  // 번역 데이터
+  const translations = {
+    ko: {
+      // 메인 제목
+      systemTitle: 'SCLab 자리 예약 시스템',
+      selectSeat: '좌석을 선택해주세요.',
+      
+      // 탭
+      room901: '901호',
+      room907: '907호',
+      
+      // 좌석 상태
+      fixed: '고정석',
+      inUse: '사용 중',
+      checkoutComplete: '퇴실 완료',
+      
+      // 시간 관련
+      hours: '시간',
+      minutes: '분',
+      
+      // 설명 텍스트
+      reservationInfo: '자리 예약 시 4시간 동안 사용 가능합니다.',
+      reservationExample: '(ex : 09:00 선택 시, 12:59 자동 퇴실)',
+      extensionInfo: '다음 예약자가 없는 경우 3시간 연장 사용이 가능합니다.',
+      
+      // 버튼
+      reserve: '예약하기',
+      checkoutCancel: '퇴실/취소하기',
+      extend: '연장하기',
+      admin: '관리자',
+      
+      // 모달 제목
+      makeReservation: '좌석 예약하기',
+      checkoutReservation: '퇴실/취소하기',
+      extendReservation: '연장하기',
+      cancel: '취소',
+      processing: '처리 중...',
+      extending: '연장 중...',
+      reserving: '예약 중...',
+      
+      // 모달 설명
+      currentSeat: '현재 선택한 좌석은',
+      seatNumber: '번입니다',
+      checkoutConfirm: '번 좌석 예약을 퇴실/취소하시겠습니까?',
+      extendConfirm: '번 좌석 사용을 연장하시겠습니까?',
+      
+      // 폼 라벨
+      studentId: '학번',
+      password: '비밀번호',
+      studentIdPlaceholder: '학번을 입력하세요',
+      passwordPlaceholder: '비밀번호를 입력하세요',
+      
+      // 연장 옵션
+      extend1Hour: '1시간 연장',
+      extend2Hours: '2시간 연장',
+      extend3Hours: '3시간 연장',
+      extensionSelected: '시간 연장이 선택되었습니다.',
+      
+      // 예약 현황
+      reservationStatus: '번 좌석 예약 현황',
+      loadingReservations: '예약 정보를 불러오는 중...',
+      noReservations: '예약이 없습니다.',
+      selectedTime: '선택된 시간:',
+      currentReservation: '현재 예약:',
+      extension: '연장:',
+      
+      // 시간 제한 메시지
+      cannotReserveBefore8: '8시 이전은 예약할 수 없습니다',
+      cannotReservePastTime: '지난 시간대는 예약할 수 없습니다',
+      alreadyReserved: '이미 예약된 시간입니다',
+      selectExtensionTime: '연장 시간 선택'
+    },
+    en: {
+      // 메인 제목
+      systemTitle: 'SCLab Seat Reservation System',
+      selectSeat: 'Please select a seat.',
+      
+      // 탭
+      room901: 'Room 901',
+      room907: 'Room 907',
+      
+      // 좌석 상태
+      fixed: 'Fixed',
+      inUse: 'In Use',
+      checkoutComplete: 'Checked Out',
+      
+      // 시간 관련
+      hours: 'hours',
+      minutes: 'minutes',
+      
+      // 설명 텍스트
+      reservationInfo: 'You can use the seat for 4 hours when making a reservation.',
+      reservationExample: '(ex: If you select 09:00, automatic checkout at 12:59)',
+      extensionInfo: 'You can extend up to 3 hours if there are no next reservations.',
+      
+      // 버튼
+      reserve: 'Reserve',
+      checkoutCancel: 'Checkout/Cancel',
+      extend: 'Extend',
+      admin: 'Admin',
+      
+      // 모달 제목
+      makeReservation: 'Make Reservation',
+      checkoutReservation: 'Checkout/Cancel',
+      extendReservation: 'Extend Reservation',
+      cancel: 'Cancel',
+      processing: 'Processing...',
+      extending: 'Extending...',
+      reserving: 'Reserving...',
+      
+      // 모달 설명
+      currentSeat: 'Currently selected seat is',
+      seatNumber: '',
+      checkoutConfirm: 'Do you want to checkout/cancel the reservation for seat',
+      extendConfirm: 'Do you want to extend the usage of seat',
+      
+      // 폼 라벨
+      studentId: 'Student ID',
+      password: 'Password',
+      studentIdPlaceholder: 'Enter your student ID',
+      passwordPlaceholder: 'Enter your password',
+      
+      // 연장 옵션
+      extend1Hour: 'Extend 1 Hour',
+      extend2Hours: 'Extend 2 Hours',
+      extend3Hours: 'Extend 3 Hours',
+      extensionSelected: 'hour extension selected.',
+      
+      // 예약 현황
+      reservationStatus: 'Reservation Status for Seat',
+      loadingReservations: 'Loading reservation information...',
+      noReservations: 'No reservations.',
+      selectedTime: 'Selected time:',
+      currentReservation: 'Current reservation:',
+      extension: 'Extension:',
+      
+      // 시간 제한 메시지
+      cannotReserveBefore8: 'Cannot reserve before 8 AM',
+      cannotReservePastTime: 'Cannot reserve past time slots',
+      alreadyReserved: 'Already reserved',
+      selectExtensionTime: 'Select Extension Time'
+    }
+  };
+
+  // 현재 언어의 번역 가져오기
+  const t = translations[language];
 
   // 컴포넌트 로드 시 모든 좌석 상태 가져오기
   useEffect(() => {
@@ -384,7 +532,7 @@ export default function Home() {
       {selectedSeat ? (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-lg font-semibold">SCLab 자리 예약 시스템</h1>
+            <h1 className="text-lg font-semibold">{t.systemTitle}</h1>
             {/* 모바일에서만 닫기 버튼 표시 */}
             <button 
               className="md:hidden p-2 hover:bg-gray-200 rounded-full"
@@ -400,18 +548,18 @@ export default function Home() {
             </button>
           </div>
           <p className="text-xs text-gray-500 mb-4">
-            자리 예약 시 4시간 동안 사용 가능합니다. <br/>
-            (ex : 09:00 선택 시, 12:59 자동 퇴실)<br/>
+            {t.reservationInfo} <br/>
+            {t.reservationExample}<br/>
             <br/>
-            다음 예약자가 없는 경우 3시간 연장 사용이 가능합니다.
+            {t.extensionInfo}
           </p>
           <h2 className="text-lg font-semibold mb-4 mt-4">
-            {selectedSeat}번 좌석 예약 현황
+            {t.reservationStatus.replace('번 좌석', ` ${selectedSeat}`)}
           </h2>
           
           {isLoadingReservations ? (
             <div className="text-center py-8 text-gray-500">
-              예약 정보를 불러오는 중...
+              {t.loadingReservations}
             </div>
           ) : seatReservations.length > 0 ? (
             <div className="space-y-3 mb-6">
@@ -431,12 +579,12 @@ export default function Home() {
                         {reservation.startedAt}:00 - {reservation.endedAt}:59
                         {isCurrentReservation && (
                           <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                            사용 중
+                            {t.inUse}
                           </span>
                         )}
                         {reservation.checkoutAt && (
                           <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                            퇴실 완료
+                            {t.checkoutComplete}
                           </span>
                         )}
                       </span>
@@ -446,7 +594,7 @@ export default function Home() {
                     </div>
                     {reservation.extendedAt && (
                       <div className="text-xs text-orange-600 mt-1">
-                        연장: {dayjs(reservation.extendedAt).add(timeOffset, 'hour').format('HH시 mm분')}
+                        {t.extension}: {dayjs(reservation.extendedAt).add(timeOffset, 'hour').format(language === 'ko' ? 'HH시 mm분' : 'HH:mm')}
                       </div>
                     )}
                   </div>
@@ -455,7 +603,7 @@ export default function Home() {
             </div>
           ) : (
             <div className="text-center py-8 text-gray-500">
-              예약이 없습니다.
+              {t.noReservations}
             </div>
           )}
           
@@ -475,7 +623,7 @@ export default function Home() {
               }}
               className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
-              예약하기
+              {t.reserve}
             </button>
           </div>
           
@@ -531,7 +679,7 @@ export default function Home() {
               }}
               className="w-full bg-red-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
             >
-              퇴실/취소하기
+              {t.checkoutCancel}
             </button>
             <button
               onClick={async () => {
@@ -578,13 +726,13 @@ export default function Home() {
               }}
               className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-orange-700 transition-colors"
             >
-              연장하기
+              {t.extend}
             </button>
           </div>
         </div>
       ) : (
         <div className="text-center py-8 text-gray-500">
-          좌석을 선택해주세요.
+          {t.selectSeat}
         </div>
       )}
     </>
@@ -601,27 +749,40 @@ export default function Home() {
 
   return (
     <>
+    {/* 언어 토글 버튼 - 상단 고정 */}
+    <div className="fixed top-4 left-4 z-30">
+      <button
+        onClick={() => setLanguage(language === 'ko' ? 'en' : 'ko')}
+        className="flex items-center space-x-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg px-3 py-2 text-sm font-medium hover:bg-white transition-colors shadow-sm"
+      >
+        <span className="text-lg">{language === 'ko' ? '🇰🇷' : '🇺🇸'}</span>
+        <span>{language === 'ko' ? '한국어' : 'English'}</span>
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
+        </svg>
+      </button>
+    </div>
     
     <Dialog open={modal.isOpen} onOpenChange={((opened) => setModal({ seatId: -1, isOpen: opened, type: 'reserve', reservationId: '' })) }>
   
   <DialogContent className="sm:max-w-lg">
     <DialogHeader>
       <DialogTitle>
-        {modal.type === 'reserve' && '좌석 예약하기'}
-        {modal.type === 'checkout' && '퇴실/취소하기'}
-        {modal.type === 'extend' && '연장하기'}
+        {modal.type === 'reserve' && t.makeReservation}
+        {modal.type === 'checkout' && t.checkoutReservation}
+        {modal.type === 'extend' && t.extendReservation}
       </DialogTitle>
       <DialogDescription className="mt-1 text-sm leading-6">
-        {modal.type === 'reserve' && `현재 선택한 좌석은 ${modal.seatId}번입니다`}
-        {modal.type === 'checkout' && `${modal.seatId}번 좌석 예약을 퇴실/취소하시겠습니까?`}
-        {modal.type === 'extend' && `${modal.seatId}번 좌석 사용을 연장하시겠습니까?`}
+        {modal.type === 'reserve' && `${t.currentSeat} ${modal.seatId}${t.seatNumber}`}
+        {modal.type === 'checkout' && `${t.checkoutConfirm} ${modal.seatId}?`}
+        {modal.type === 'extend' && `${t.extendConfirm} ${modal.seatId}?`}
       </DialogDescription>
     </DialogHeader>
     {modal.type === 'reserve' && (
     <div className="grid grid-cols-6 grid-rows-3 gap-1">
         {isLoadingReservations ? (
           <div className="col-span-6 text-center py-4 text-gray-500">
-            예약 정보를 불러오는 중...
+            {t.loadingReservations}
           </div>
         ) : (
           Array.from({length: 16}).map((x, i) =>{
@@ -656,11 +817,11 @@ export default function Home() {
                 }`}
                 title={
                   isReserved 
-                    ? `이미 예약된 시간입니다 (${reservationDetails[i]})` 
+                    ? `${t.alreadyReserved} (${reservationDetails[i]})` 
                     : isPastTime 
-                      ? '지난 시간대는 예약할 수 없습니다'
+                      ? t.cannotReservePastTime
                       : isBeforeEightAM
-                        ? '8시 이전은 예약할 수 없습니다'
+                        ? t.cannotReserveBefore8
                         : ''
                 }
               >
@@ -701,7 +862,7 @@ export default function Home() {
         
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            연장 시간 선택
+            {t.selectExtensionTime}
           </label>
           <div className="grid grid-cols-3 gap-2">
             <button
@@ -712,7 +873,7 @@ export default function Home() {
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
               }`}
             >
-              1시간 연장
+              {t.extend1Hour}
             </button>
             <button
               onClick={() => setSelectedTimes([2])}
@@ -722,7 +883,7 @@ export default function Home() {
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
               }`}
             >
-              2시간 연장
+              {t.extend2Hours}
             </button>
             <button
               onClick={() => setSelectedTimes([3])}
@@ -732,7 +893,7 @@ export default function Home() {
                   : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
               }`}
             >
-              3시간 연장
+              {t.extend3Hours}
             </button>
           </div>
         </div>
@@ -743,7 +904,7 @@ export default function Home() {
     {selectedTimes.length > 0 && modal.type === 'reserve' && (
       <div className="mt-4 p-3 bg-blue-50 rounded-lg">
         <p className="text-sm font-medium text-blue-900">
-          선택된 시간: {Math.min(...selectedTimes) + 9}:00 - {Math.max(...selectedTimes) + 9}:59
+          {t.selectedTime} {Math.min(...selectedTimes) + 9}:00 - {Math.max(...selectedTimes) + 9}:59
         </p>
       </div>
     )}
@@ -751,7 +912,7 @@ export default function Home() {
     {selectedTimes.length > 0 && modal.type === 'extend' && (
       <div className="mt-4 p-3 bg-orange-50 rounded-lg">
         <p className="text-sm font-medium text-orange-900">
-          {selectedTimes[0]}시간 연장이 선택되었습니다.
+          {selectedTimes[0]}{t.extensionSelected}
         </p>
       </div>
     )}
@@ -760,7 +921,7 @@ export default function Home() {
     <div className="mt-4 space-y-3">
       <div>
         <label htmlFor="studentId" className="block text-sm font-medium text-gray-700 mb-1">
-          학번
+          {t.studentId}
         </label>
         <input
           type="text"
@@ -768,12 +929,12 @@ export default function Home() {
           value={reservationForm.studentId}
           onChange={(e) => setReservationForm(prev => ({ ...prev, studentId: e.target.value }))}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="학번을 입력하세요"
+          placeholder={t.studentIdPlaceholder}
         />
       </div>
       <div>
         <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-          비밀번호
+          {t.password}
         </label>
         <input
           type="password"
@@ -781,7 +942,7 @@ export default function Home() {
           value={reservationForm.password}
           onChange={(e) => setReservationForm(prev => ({ ...prev, password: e.target.value }))}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          placeholder="비밀번호를 입력하세요"
+          placeholder={t.passwordPlaceholder}
         />
       </div>
     </div>
@@ -789,7 +950,7 @@ export default function Home() {
     <DialogFooter className="mt-6">
       <DialogClose asChild>
         <button className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
-          취소
+          {t.cancel}
         </button>
       </DialogClose>
       <button
@@ -812,8 +973,8 @@ export default function Home() {
         }`}
       >
         {isSubmitting 
-          ? (modal.type === 'checkout' ? '처리 중...' : modal.type === 'extend' ? '연장 중...' : '예약 중...')
-          : (modal.type === 'checkout' ? '퇴실/취소하기' : modal.type === 'extend' ? '연장하기' : '예약하기')
+          ? (modal.type === 'checkout' ? t.processing : modal.type === 'extend' ? t.extending : t.reserving)
+          : (modal.type === 'checkout' ? t.checkoutCancel : modal.type === 'extend' ? t.extend : t.reserve)
         }
       </button>
     </DialogFooter>
@@ -824,8 +985,8 @@ export default function Home() {
       <div className="flex-1 md:flex-1 w-full">
       <Tabs defaultValue="tab1">
           <TabsList className="fixed right-0 left-0 w-min mx-auto top-8 z-10" variant="solid">
-          <TabsTrigger value="tab1">901호</TabsTrigger>
-          <TabsTrigger value="tab2">907호</TabsTrigger>
+          <TabsTrigger value="tab1">{t.room901}</TabsTrigger>
+          <TabsTrigger value="tab2">{t.room907}</TabsTrigger>
         </TabsList>
     <div className="ml-2 mt-28">
     
@@ -888,7 +1049,7 @@ export default function Home() {
             const seatNumber = i + 5;
             const 고정석 = [2]; // 6번 좌석이 고정석
             const isFixed = 고정석.includes(i + 1);
-            const text = isFixed ? "고정석" : seatNumber;
+            const text = isFixed ? t.fixed : seatNumber;
             const seatStatus = allSeatsStatus[seatNumber] || 'available';
             const remainingMinutes = seatRemainingTime[seatNumber] || 0;
             
@@ -943,7 +1104,7 @@ export default function Home() {
              const seatNumber = i + 9;
              const 고정석 = [4]; // 12번 좌석이 고정석
              const isFixed = 고정석.includes(i + 1);
-             const text = isFixed ? "고정석" : seatNumber;
+             const text = isFixed ? t.fixed : seatNumber;
              const seatStatus = allSeatsStatus[seatNumber] || 'available';
              const remainingMinutes = seatRemainingTime[seatNumber] || 0;
              
@@ -1004,7 +1165,7 @@ export default function Home() {
               const seatNumber = i + 13;
               const 고정석 = [1]; // 13번 좌석이 고정석
               const isFixed = 고정석.includes(i + 1);
-              const text = isFixed ? "고정석" : seatNumber;
+              const text = isFixed ? t.fixed : seatNumber;
               const seatStatus = allSeatsStatus[seatNumber] || 'available';
               const remainingMinutes = seatRemainingTime[seatNumber] || 0;
               
@@ -1096,7 +1257,7 @@ export default function Home() {
       href="/admin"
       className="fixed bottom-6 right-6 bg-gray-800 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors shadow-lg z-20"
     >
-      관리자
+      {t.admin}
     </Link>
     </>
 
