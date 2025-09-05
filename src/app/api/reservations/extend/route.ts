@@ -70,12 +70,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    if (reservation.user_id !== user.id) {
-      return NextResponse.json(
-        { error: '본인의 예약만 연장할 수 있습니다.' },
-        { status: 403 }
-      );
-    }
+    // 패스워드 인증으로만 권한 확인 - user_id 검증 제거
 
     // 연장 횟수 제한 확인 (최대 2회)
     if (reservation.extendedCount >= 2) {
@@ -91,6 +86,13 @@ export async function PATCH(request: NextRequest) {
     // 연장하려는 시간대가 비어있는지 확인
     const newEndedAt = reservation.endedAt + extendHours;
     const extendStartTime = reservation.endedAt + 1; // 연장은 기존 예약 다음 시간부터 시작
+    
+    console.log('=== 연장 처리 디버깅 ===');
+    console.log('- 예약 ID:', reservationId);
+    console.log('- 원래 endedAt:', reservation.endedAt);
+    console.log('- 연장 시간 (extendHours):', extendHours);
+    console.log('- 계산된 newEndedAt:', newEndedAt);
+    console.log('- extendStartTime:', extendStartTime);
     
     // 연장 시간대에 다른 ACTIVE 예약이 있는지 확인
     const conflictingReservation = await prisma.reservation.findFirst({
@@ -138,6 +140,12 @@ export async function PATCH(request: NextRequest) {
     }
 
     // 예약 연장
+    console.log('- 업데이트 데이터:', {
+      endedAt: newEndedAt,
+      extendedAt: dayjs.tz().toDate(),
+      extendedCount: reservation.extendedCount + 1,
+    });
+    
     const updatedReservation = await prisma.reservation.update({
       where: { id: reservationId },
       data: {
@@ -153,6 +161,15 @@ export async function PATCH(request: NextRequest) {
         }
       }
     });
+    
+    console.log('- 업데이트 결과:', {
+      id: updatedReservation.id,
+      startedAt: updatedReservation.startedAt,
+      endedAt: updatedReservation.endedAt,
+      extendedAt: updatedReservation.extendedAt,
+      extendedCount: updatedReservation.extendedCount
+    });
+    console.log('========================');
 
     return NextResponse.json({
       message: `성공적으로 ${extendHours}시간 연장되었습니다.`,

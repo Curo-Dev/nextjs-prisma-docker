@@ -13,8 +13,9 @@ import {
 } from "../components/Dialog";
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dayjs from 'dayjs';
+import Link from 'next/link';
 
 export default function Home() {
   const [modal, setModal] = useState({
@@ -42,7 +43,75 @@ export default function Home() {
   const [reservedTimeSlots, setReservedTimeSlots] = useState<number[]>([]);
   const [reservationDetails, setReservationDetails] = useState<{[key: number]: string}>({});
   const [isLoadingReservations, setIsLoadingReservations] = useState(false);
+  const [allSeatsStatus, setAllSeatsStatus] = useState<{[key: number]: 'available' | 'occupied' | 'fixed'}>({});
+  const [seatRemainingTime, setSeatRemainingTime] = useState<{[key: number]: number}>({});
   const { loading } = useAuth();
+
+  // 컴포넌트 로드 시 모든 좌석 상태 가져오기
+  useEffect(() => {
+    fetchAllSeatsStatus();
+    // 30초마다 상태 업데이트
+    const interval = setInterval(fetchAllSeatsStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // 모든 좌석 상태 가져오기
+  const fetchAllSeatsStatus = async () => {
+    try {
+      const response = await fetch('/api/reservations');
+      const data = await response.json();
+      
+      if (response.ok) {
+        const now = dayjs();
+        const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
+        const currentHour = now.hour() + timeOffset;
+        
+        const seatsStatus: {[key: number]: 'available' | 'occupied' | 'fixed'} = {};
+        const remainingTime: {[key: number]: number} = {};
+        
+        // 고정석 정의
+        const fixedSeats = [6, 12, 13]; // 901호 6번 좌석, 901호 12번 좌석, 907호 13번 좌석
+        
+        // 모든 좌석을 먼저 available로 초기화
+        for (let i = 1; i <= 17; i++) {
+          if (fixedSeats.includes(i)) {
+            seatsStatus[i] = 'fixed';
+          } else {
+            seatsStatus[i] = 'available';
+          }
+        }
+        
+        // 현재 사용중인 좌석 확인 및 남은 시간 계산
+        if (data.allReservations) {
+          data.allReservations.forEach((reservation: {
+            seat_id: number;
+            startedAt: number;
+            endedAt: number;
+            checkoutAt: string | null;
+          }) => {
+            const isCurrentlyUsed = !reservation.checkoutAt && 
+              currentHour >= reservation.startedAt && 
+              currentHour <= reservation.endedAt;
+            
+            if (isCurrentlyUsed && !fixedSeats.includes(reservation.seat_id)) {
+              seatsStatus[reservation.seat_id] = 'occupied';
+              // 남은 시간 계산 (분 단위)
+              const currentMinute = now.minute();
+              const endTimeInMinutes = (reservation.endedAt + 1) * 60; // 예: 12시 예약이면 12:59까지
+              const currentTimeInMinutes = currentHour * 60 + currentMinute;
+              const remainingMinutes = endTimeInMinutes - currentTimeInMinutes;
+              remainingTime[reservation.seat_id] = Math.max(0, remainingMinutes);
+            }
+          });
+        }
+        
+        setAllSeatsStatus(seatsStatus);
+        setSeatRemainingTime(remainingTime);
+      }
+    } catch (error) {
+      console.error('Error fetching all seats status:', error);
+    }
+  };
 
   // 좌석 예약 정보 가져오기
   const fetchSeatReservations = async (seatId: number) => {
@@ -90,12 +159,19 @@ export default function Home() {
       return;
     }
     
-    // 지난 시간대는 선택 불가
+    // 지난 시간대는 선택 불가 (8시 이전은 예약 불가)
     const now = dayjs()
     const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
     const currentHour = now.hour() + timeOffset;
     const timeSlotHour = timeIndex + 9;
-    if (timeSlotHour < currentHour) {
+    
+    // 8시 이전은 예약 불가
+    if (timeSlotHour < 8) {
+      return;
+    }
+    
+    // 현재 시간보다 이전 시간대는 선택 불가 (단, 8시 이후만)
+    if (timeSlotHour >= 8 && timeSlotHour < currentHour) {
       return;
     }
 
@@ -311,12 +387,12 @@ export default function Home() {
     <DialogHeader>
       <DialogTitle>
         {modal.type === 'reserve' && '좌석 예약하기'}
-        {modal.type === 'checkout' && '퇴실하기'}
+        {modal.type === 'checkout' && '퇴실/취소하기'}
         {modal.type === 'extend' && '연장하기'}
       </DialogTitle>
       <DialogDescription className="mt-1 text-sm leading-6">
         {modal.type === 'reserve' && `현재 선택한 좌석은 ${modal.seatId}번입니다`}
-        {modal.type === 'checkout' && `${modal.seatId}번 좌석에서 퇴실하시겠습니까?`}
+        {modal.type === 'checkout' && `${modal.seatId}번 좌석 예약을 퇴실/취소하시겠습니까?`}
         {modal.type === 'extend' && `${modal.seatId}번 좌석 사용을 연장하시겠습니까?`}
       </DialogDescription>
     </DialogHeader>
@@ -331,14 +407,15 @@ export default function Home() {
             const isSelected = selectedTimes.includes(i);
             const isReserved = reservedTimeSlots.includes(i);
             
-            // 현재 시간 확인 (지난 시간대는 예약 불가)
+            // 현재 시간 확인 (지난 시간대는 예약 불가, 8시 이전 예약 불가)
             const now = dayjs()
             const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
             const currentHour = now.hour() + timeOffset;
             const timeSlotHour = i + 9; // 시간 슬롯의 실제 시간 (9시부터 시작)
-            const isPastTime = timeSlotHour < currentHour;
+            const isBeforeEightAM = timeSlotHour < 8;
+            const isPastTime = timeSlotHour >= 8 && timeSlotHour < currentHour;
             
-            const isDisabled = isReserved || isPastTime;
+            const isDisabled = isReserved || isPastTime || isBeforeEightAM;
             
       return (
               <button 
@@ -350,16 +427,20 @@ export default function Home() {
                     ? 'bg-red-100 text-red-400 border-red-200 cursor-not-allowed'
                     : isPastTime
                       ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                      : isSelected 
-                        ? 'bg-blue-500 text-white border-blue-500' 
-                        : 'bg-white text-gray-700 hover:bg-gray-50'
+                      : isBeforeEightAM
+                        ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                        : isSelected 
+                          ? 'bg-blue-500 text-white border-blue-500' 
+                          : 'bg-white text-gray-700 hover:bg-gray-50'
                 }`}
                 title={
                   isReserved 
                     ? `이미 예약된 시간입니다 (${reservationDetails[i]})` 
                     : isPastTime 
                       ? '지난 시간대는 예약할 수 없습니다'
-                      : ''
+                      : isBeforeEightAM
+                        ? '8시 이전은 예약할 수 없습니다'
+                        : ''
                 }
               >
                 <div className="text-sm font-medium">
@@ -510,8 +591,8 @@ export default function Home() {
         }`}
       >
         {isSubmitting 
-          ? (modal.type === 'checkout' ? '퇴실 중...' : modal.type === 'extend' ? '연장 중...' : '예약 중...')
-          : (modal.type === 'checkout' ? '퇴실하기' : modal.type === 'extend' ? '연장하기' : '예약하기')
+          ? (modal.type === 'checkout' ? '처리 중...' : modal.type === 'extend' ? '연장 중...' : '예약 중...')
+          : (modal.type === 'checkout' ? '퇴실/취소하기' : modal.type === 'extend' ? '연장하기' : '예약하기')
         }
       </button>
     </DialogFooter>
@@ -533,63 +614,136 @@ export default function Home() {
       >
         <div className="grid grid-cols-5 grid-rows-5 max-w-lg mx-auto gap-2">
           {Array.from({length: 4}).map((x, i) =>{
+            const seatNumber = i + 1;
+            const seatStatus = allSeatsStatus[seatNumber] || 'available';
+            const remainingMinutes = seatRemainingTime[seatNumber] || 0;
+            const getSeatColor = () => {
+              if (selectedSeat === seatNumber) return 'bg-blue-100 border-2 border-blue-500';
+              switch (seatStatus) {
+                case 'occupied': return 'bg-green-500 text-white hover:bg-green-600';
+                case 'fixed': return 'bg-gray-700 text-white cursor-not-allowed';
+                default: return 'bg-gray-400 text-white hover:bg-gray-500';
+              }
+            };
+            
+            const formatRemainingTime = (minutes: number) => {
+              const hours = Math.floor(minutes / 60);
+              const mins = minutes % 60;
+              if (hours > 0) {
+                return `${hours}h ${mins}m`;
+              }
+              return `${mins}m`;
+            };
+            
             return (
-            <button key={i} className={`aspect-square flex justify-center items-center transition-colors ${i > 1 && "row-start-2"} ${
-              selectedSeat === i + 1 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
-            }`}
+            <button key={i} className={`aspect-square flex flex-col justify-center items-center transition-colors text-xs ${i > 1 && "row-start-2"} ${getSeatColor()}`}
             onClick={() => {
-              setSelectedSeat(i + 1);
+              if (seatStatus === 'fixed') return;
+              setSelectedSeat(seatNumber);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
               setReservedTimeSlots([]);
               setReservationDetails({});
               setSeatReservations([]);
-              fetchSeatReservations(i + 1);
+              fetchSeatReservations(seatNumber);
             }}
-            >{i + 1}</button>
+            >
+              <div className="font-medium">{seatNumber}</div>
+              {seatStatus === 'occupied' && remainingMinutes > 0 && (
+                <div className="text-xs opacity-90">{formatRemainingTime(remainingMinutes)}</div>
+              )}
+            </button>
           )})}
           {Array.from({length: 4}).map((x, i) =>{
-            const 고정석 = [
-              2
-            ]
-            const text = 고정석.find((y) => y == i + 1) ? "고정석" : i + 5
+            const seatNumber = i + 5;
+            const 고정석 = [2]; // 6번 좌석이 고정석
+            const isFixed = 고정석.includes(i + 1);
+            const text = isFixed ? "고정석" : seatNumber;
+            const seatStatus = allSeatsStatus[seatNumber] || 'available';
+            const remainingMinutes = seatRemainingTime[seatNumber] || 0;
+            
+            const getSeatColor = () => {
+              if (selectedSeat === seatNumber) return 'bg-blue-100 border-2 border-blue-500';
+              if (isFixed) return 'bg-gray-700 text-white cursor-not-allowed';
+              switch (seatStatus) {
+                case 'occupied': return 'bg-green-500 text-white hover:bg-green-600';
+                default: return 'bg-gray-400 text-white hover:bg-gray-500';
+              }
+            };
+            
+            const formatRemainingTime = (minutes: number) => {
+              const hours = Math.floor(minutes / 60);
+              const mins = minutes % 60;
+              if (hours > 0) {
+                return `${hours}h ${mins}m`;
+              }
+              return `${mins}m`;
+            };
+            
             return (
-            <button key={i} className={`aspect-square flex justify-center items-center col-start-4 bg-gray-50 ${((i + 1) % 2) == 0 && "col-start-5"}  ${
-              selectedSeat === i + 5 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
-            }`}
+            <button key={i} className={`aspect-square flex flex-col justify-center items-center text-xs col-start-4 ${((i + 1) % 2) == 0 && "col-start-5"} ${getSeatColor()}`}
             onClick={() => {
-              if(text == "고정석") {
+              if(isFixed) {
                 return;
               }
-              setSelectedSeat(i + 5);
+              setSelectedSeat(seatNumber);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
               setReservedTimeSlots([]);
               setReservationDetails({});
               setSeatReservations([]);
-              fetchSeatReservations(i + 5);
-            }}>{text}</button>
+              fetchSeatReservations(seatNumber);
+            }}>
+              <div className="font-medium">{text}</div>
+              {seatStatus === 'occupied' && remainingMinutes > 0 && !isFixed && (
+                <div className="text-xs opacity-90">{formatRemainingTime(remainingMinutes)}</div>
+              )}
+            </button>
           )})}
            {Array.from({length: 5}).map((x, i) =>{
-             const 고정석 = [
-              4
-            ]
-            const text = 고정석.find((y) => y == i + 1) ? "고정석" : i + 9
+             const seatNumber = i + 9;
+             const 고정석 = [4]; // 12번 좌석이 고정석
+             const isFixed = 고정석.includes(i + 1);
+             const text = isFixed ? "고정석" : seatNumber;
+             const seatStatus = allSeatsStatus[seatNumber] || 'available';
+             const remainingMinutes = seatRemainingTime[seatNumber] || 0;
+             
+             const getSeatColor = () => {
+               if (selectedSeat === seatNumber) return 'bg-blue-100 border-2 border-blue-500';
+               if (isFixed) return 'bg-gray-700 text-white cursor-not-allowed';
+               switch (seatStatus) {
+                 case 'occupied': return 'bg-green-500 text-white hover:bg-green-600';
+                 default: return 'bg-gray-400 text-white hover:bg-gray-500';
+               }
+             };
+             
+             const formatRemainingTime = (minutes: number) => {
+               const hours = Math.floor(minutes / 60);
+               const mins = minutes % 60;
+               if (hours > 0) {
+                 return `${hours}h ${mins}m`;
+               }
+               return `${mins}m`;
+             };
+             
             return (
-            <button key={i} className={`aspect-square flex justify-center items-center bg-gray-50 row-start-4 ${
-              selectedSeat === i + 9 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
-            }`} onClick={() => {
-              if(text == "고정석") {
+            <button key={i} className={`aspect-square flex flex-col justify-center items-center text-xs row-start-4 ${getSeatColor()}`} onClick={() => {
+              if(isFixed) {
                 return;
               }
-              setSelectedSeat(i + 9);
+              setSelectedSeat(seatNumber);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
               setReservedTimeSlots([]);
               setReservationDetails({});
               setSeatReservations([]);
-              fetchSeatReservations(i + 9);
-            }}>{text}</button>
+              fetchSeatReservations(seatNumber);
+            }}>
+              <div className="font-medium">{text}</div>
+              {seatStatus === 'occupied' && remainingMinutes > 0 && !isFixed && (
+                <div className="text-xs opacity-90">{formatRemainingTime(remainingMinutes)}</div>
+              )}
+            </button>
           )})}
         </div>
       </TabsContent>
@@ -597,29 +751,53 @@ export default function Home() {
         value="tab2"
         className=""
       >
-        <div className="grid grid-cols-2 grid-rows-3 max-w-lg mx-auto gap-2">
+        <div className="grid grid-cols-2 grid-rows-3 max-w-sm mx-auto gap-2">
           {Array.from({length: 5}).map((x, i) =>{
-              const 고정석 = [
-                1
-              ]
-              const text = 고정석.find((y) => y == i + 1) ? "고정석" : i + 13
+              const seatNumber = i + 13;
+              const 고정석 = [1]; // 13번 좌석이 고정석
+              const isFixed = 고정석.includes(i + 1);
+              const text = isFixed ? "고정석" : seatNumber;
+              const seatStatus = allSeatsStatus[seatNumber] || 'available';
+              const remainingMinutes = seatRemainingTime[seatNumber] || 0;
+              
+              const getSeatColor = () => {
+                if (selectedSeat === seatNumber) return 'bg-blue-100 border-2 border-blue-500';
+                if (isFixed) return 'bg-gray-700 text-white cursor-not-allowed';
+                switch (seatStatus) {
+                  case 'occupied': return 'bg-green-500 text-white hover:bg-green-600';
+                  default: return 'bg-gray-400 text-white hover:bg-gray-500';
+                }
+              };
+              
+              const formatRemainingTime = (minutes: number) => {
+                const hours = Math.floor(minutes / 60);
+                const mins = minutes % 60;
+                if (hours > 0) {
+                  return `${hours}h ${mins}m`;
+                }
+                return `${mins}m`;
+              };
+              
             return (
-            <button key={i} className={`aspect-square flex justify-center items-center transition-colors ${
-              selectedSeat === i + 13 ? 'bg-blue-100 border-2 border-blue-500' : 'bg-gray-50 hover:bg-gray-100'
-            }`}
+            <button key={i} className={`aspect-square flex flex-col justify-center items-center text-xs transition-colors ${getSeatColor()}`}
             onClick={() => {
-              if(text == "고정석") {
+              if(isFixed) {
                 return;
               }
-              setSelectedSeat(i + 13);
+              setSelectedSeat(seatNumber);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
               setReservedTimeSlots([]);
               setReservationDetails({});
               setSeatReservations([]);
-              fetchSeatReservations(i + 13);
+              fetchSeatReservations(seatNumber);
             }}
-            >{text}</button>
+            >
+              <div className="font-medium">{text}</div>
+              {seatStatus === 'occupied' && remainingMinutes > 0 && !isFixed && (
+                <div className="text-xs opacity-90">{formatRemainingTime(remainingMinutes)}</div>
+              )}
+            </button>
           )})}
         </div>
       </TabsContent>
@@ -631,7 +809,7 @@ export default function Home() {
       <div className="w-80 bg-gray-50 border-l border-gray-200 p-4 min-h-screen">
         {selectedSeat ? (
           <div>
-            <h1 className="text-lg font-semibold mb-4">SCLab자리 예약 시스템 사용자</h1>
+            <h1 className="text-lg font-semibold mb-4">SCLab 자리 예약 시스템</h1>
             <p className="text-xs text-gray-500 mb-4">
               자리 예약 시 4시간 동안 사용 가능합니다. <br/>
               (ex : 09:00 선택 시, 12:59 자동 퇴실)<br/>
@@ -704,24 +882,26 @@ export default function Home() {
               </div>
             )}
             
-            <button
-              onClick={() => {
-                setModal({ 
-                  isOpen: true, 
-                  seatId: selectedSeat!, 
-                  type: 'reserve',
-                  reservationId: ''
-                });
-                if (selectedSeat) {
-                  fetchSeatReservations(selectedSeat);
-                }
-              }}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-            >
-              예약하기
-            </button>
+            <div className="mt-8">
+              <button
+                onClick={() => {
+                  setModal({ 
+                    isOpen: true, 
+                    seatId: selectedSeat!, 
+                    type: 'reserve',
+                    reservationId: ''
+                  });
+                  if (selectedSeat) {
+                    fetchSeatReservations(selectedSeat);
+                  }
+                }}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              >
+                예약하기
+              </button>
+            </div>
             
-            <div className="space-y-2 mt-4">
+            <div className="space-y-2 mt-6">
               <button
                 onClick={async () => {
                   // 최신 예약 정보를 가져온 후 현재 사용 중인 예약 찾기
@@ -731,25 +911,48 @@ export default function Home() {
                   
                   // 약간의 지연 후 최신 데이터로 현재 예약 찾기
                   setTimeout(() => {
-                    const currentReservation = seatReservations.find(reservation => 
+                    const now = dayjs();
+                    const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
+                    const currentHour = now.hour() + timeOffset;
+                    
+                    console.log('=== 퇴실 버튼 클릭 디버깅 ===');
+                    console.log('- 현재 시간:', now.format('YYYY-MM-DD HH:mm:ss'));
+                    console.log('- 시간 오프셋:', timeOffset);
+                    console.log('- 계산된 현재 시간:', currentHour);
+                    console.log('- 좌석 예약 목록:', seatReservations);
+                    
+                    // 활성 상태인 예약 중에서 선택 (현재 사용중 또는 미래 예약)
+                    const activeReservations = seatReservations.filter(reservation => 
                       !reservation.checkoutAt
                     );
                     
-                    if (currentReservation) {
-                      setModal({ 
-                        isOpen: true, 
-                        seatId: selectedSeat!, 
-                        type: 'checkout',
-                        reservationId: currentReservation.id
-                      });
-                    } else {
-                      alert('현재 사용 중인 예약을 찾을 수 없습니다.');
+                    console.log('- 활성 예약 목록:', activeReservations);
+                    
+                    if (activeReservations.length === 0) {
+                      console.log('- 활성 예약 없음');
+                      console.log('================================');
+                      alert('퇴실/취소할 수 있는 예약을 찾을 수 없습니다.');
+                      return;
                     }
+                    
+                    // 활성 예약이 있으면 첫 번째 예약을 선택 (패스워드로 권한 확인)
+                    const targetReservation = activeReservations[0];
+                    console.log('- 선택된 예약:', targetReservation);
+                    console.log('- 예약 시간:', `${targetReservation.startedAt}:00 - ${targetReservation.endedAt}:59`);
+                    console.log('- 현재 시간과 비교:', currentHour >= targetReservation.startedAt && currentHour <= targetReservation.endedAt ? '사용중' : '미래/과거 예약');
+                    console.log('================================');
+                    
+                    setModal({ 
+                      isOpen: true, 
+                      seatId: selectedSeat!, 
+                      type: 'checkout',
+                      reservationId: targetReservation.id
+                    });
                   }, 100);
                 }}
                 className="w-full bg-red-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
               >
-                퇴실하기
+                퇴실/취소하기
               </button>
               <button
                 onClick={async () => {
@@ -806,6 +1009,14 @@ export default function Home() {
         )}
       </div>
     </main>
+    
+    {/* 관리자 버튼 - 우하단 고정 */}
+    <Link 
+      href="/admin"
+      className="fixed bottom-6 right-6 bg-gray-800 text-white px-4 py-2 rounded-lg font-medium hover:bg-gray-900 transition-colors shadow-lg z-20"
+    >
+      관리자
+    </Link>
     </>
 
   );

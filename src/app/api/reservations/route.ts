@@ -71,18 +71,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 같은 날짜, 같은 좌석의 모든 관련 예약 조회 (ACTIVE + 퇴실한 EXPIRED, CANCELLED 제외)
+    // 같은 날짜, 같은 좌석의 활성 예약만 조회 (ACTIVE 상태만, 퇴실한 예약은 제외)
     const existingReservations = await prisma.reservation.findMany({
       where: {
         seat_id: parseInt(seatId),
         refDate: refDate,
-        OR: [
-          { status: 'ACTIVE' },
-          { 
-            status: 'EXPIRED',
-            checkoutAt: { not: null }
-          }
-        ]
+        status: 'ACTIVE' // ACTIVE 상태만 검사
       },
       select: {
         id: true,
@@ -93,32 +87,35 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // 시간 충돌 검사 (퇴실한 예약은 실제 사용 시간만 검사)
+    // 디버깅 로그 추가
+    console.log('=== 예약 생성 시간 충돌 검사 ===');
+    console.log('- 새로운 예약 시간:', `${startedAt}:00 - ${endedAt}:59`);
+    console.log('- 검사할 기존 예약 목록:', existingReservations);
+    
+    // 시간 충돌 검사 (ACTIVE 예약과만 비교)
     for (const reservation of existingReservations) {
-      let actualEndedAt = reservation.endedAt;
-      
-      // 퇴실한 예약의 경우 실제 사용 시간만 검사
-      if (reservation.checkoutAt && reservation.status === 'EXPIRED') {
-        const checkoutTime = dayjs(reservation.checkoutAt).add(9, 'hour');
-        const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0');
-        const checkoutHour = checkoutTime.hour() + timeOffset;
-        actualEndedAt = checkoutHour;
-      }
-      
-      // 시간 겹침 검사
+      // ACTIVE 예약은 원래 예약 시간으로 충돌 검사
       const hasConflict = (
-        (startedAt >= reservation.startedAt && startedAt <= actualEndedAt) ||
-        (endedAt >= reservation.startedAt && endedAt <= actualEndedAt) ||
-        (startedAt <= reservation.startedAt && endedAt >= actualEndedAt)
+        (startedAt >= reservation.startedAt && startedAt <= reservation.endedAt) ||
+        (endedAt >= reservation.startedAt && endedAt <= reservation.endedAt) ||
+        (startedAt <= reservation.startedAt && endedAt >= reservation.endedAt)
       );
       
+      console.log(`- 예약 ${reservation.id}: ${reservation.startedAt}-${reservation.endedAt} (status: ${reservation.status})`);
+      console.log(`  충돌 여부: ${hasConflict}`);
+      
       if (hasConflict) {
+        console.log('- 충돌 발견! 예약 생성 실패');
+        console.log('================================');
         return NextResponse.json(
           { error: '해당 시간대에 이미 예약이 있습니다.' },
           { status: 409 }
         );
       }
     }
+
+    console.log('- 충돌 없음! 예약 생성 진행');
+    console.log('================================');
 
     // 예약 생성
     const reservation = await prisma.reservation.create({
@@ -207,26 +204,8 @@ export async function GET(request: NextRequest) {
       reservations.forEach(reservation => {
         let actualEndedAt = reservation.endedAt;
         
-        // 퇴실한 예약의 경우 실제 사용 시간만 계산
-        if (reservation.checkoutAt && reservation.status === 'EXPIRED') {
-          const checkoutTime = dayjs(reservation.checkoutAt);
-          const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0');
-          const checkoutTimeWithOffset = checkoutTime.add(timeOffset, 'hour'); // 날짜와 시간을 함께 고려
-
-          // 예약 시간을 dayjs 객체로 변환 (refDate 기준)
-          const reservationDate = dayjs(reservation.refDate);
-          const reservationStart = reservationDate.hour(reservation.startedAt).startOf('hour');
-          const reservationEnd = reservationDate.hour(reservation.endedAt).endOf('hour');
-
-          // 퇴실 시간이 예약 시간 내에 있는지 확인
-          if (checkoutTimeWithOffset.isAfter(reservationStart) && checkoutTimeWithOffset.isBefore(reservationEnd)) {
-            // 퇴실 시간이 예약 시간 내에 있으면 실제 퇴실 시간 사용
-            // 예: 9시 20분 퇴실 → 9시대 사용, endedAt = 9
-            // 예: 10시 5분 퇴실 → 10시대 사용, endedAt = 10
-            actualEndedAt = checkoutTimeWithOffset.hour();
-          }
-          // 그렇지 않으면 원래 endedAt 유지
-        }
+        // 퇴실한 예약의 경우 원래 예약 시간 전체를 사용한 것으로 간주
+        // (연장된 시간 포함하여 원래 endedAt까지 예약된 것으로 처리)
         
         for (let i = reservation.startedAt - 9; i <= actualEndedAt - 9; i++) {
           if (i >= 0 && i < 16) {
