@@ -12,10 +12,10 @@ dayjs.tz.setDefault("Asia/Seoul");
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { reservationId, password, studentId, extendHours } = body;
+    const { password, studentId, extendHours } = body;
 
-    // 필수 필드 검증
-    if (!reservationId || !password || !studentId || !extendHours) {
+    // 필수 필드 검증 (reservationId 제거)
+    if (!password || !studentId || !extendHours) {
       return NextResponse.json(
         { error: '모든 필드를 입력해주세요.' },
         { status: 400 }
@@ -50,27 +50,21 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    // 예약 정보 조회 및 소유권 확인
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: reservationId },
+    // 해당 사용자의 활성 예약 찾기 (하루에 하나만 있음)
+    const reservation = await prisma.reservation.findFirst({
+      where: { 
+        user_id: user.id,
+        status: 'ACTIVE'
+      },
       include: { user: true }
     });
 
     if (!reservation) {
       return NextResponse.json(
-        { error: '예약 정보를 찾을 수 없습니다.' },
+        { error: '연장할 수 있는 활성 예약을 찾을 수 없습니다.' },
         { status: 404 }
       );
     }
-
-    if (reservation.status !== 'ACTIVE') {
-      return NextResponse.json(
-        { error: '활성 상태가 아닌 예약은 연장할 수 없습니다.' },
-        { status: 400 }
-      );
-    }
-
-    // 패스워드 인증으로만 권한 확인 - user_id 검증 제거
 
     // 연장 횟수 제한 확인 (최대 2회)
     if (reservation.extendedCount >= 2) {
@@ -88,7 +82,9 @@ export async function PATCH(request: NextRequest) {
     const extendStartTime = reservation.endedAt + 1; // 연장은 기존 예약 다음 시간부터 시작
     
     console.log('=== 연장 처리 디버깅 ===');
-    console.log('- 예약 ID:', reservationId);
+    console.log('- 학번:', studentId);
+    console.log('- 찾은 예약 ID:', reservation.id);
+    console.log('- 좌석 번호:', reservation.seat_id);
     console.log('- 원래 endedAt:', reservation.endedAt);
     console.log('- 연장 시간 (extendHours):', extendHours);
     console.log('- 계산된 newEndedAt:', newEndedAt);
@@ -100,7 +96,7 @@ export async function PATCH(request: NextRequest) {
         seat_id: reservation.seat_id,
         refDate: refDate,
         status: 'ACTIVE',
-        id: { not: reservationId }, // 현재 예약 제외
+        id: { not: reservation.id }, // 현재 예약 제외
         OR: [
           {
             AND: [
@@ -147,7 +143,7 @@ export async function PATCH(request: NextRequest) {
     });
     
     const updatedReservation = await prisma.reservation.update({
-      where: { id: reservationId },
+      where: { id: reservation.id },
       data: {
         endedAt: newEndedAt,
         extendedAt: dayjs.tz().toDate(),

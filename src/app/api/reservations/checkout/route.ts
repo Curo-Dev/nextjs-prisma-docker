@@ -19,11 +19,11 @@ dayjs.tz.setDefault("Asia/Seoul");
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { reservationId, password, studentId } = body;
+    const { password, studentId } = body;
 
-    // 필수 필드 검증
-    if (!reservationId || !password || !studentId) {
-      return NextResponse.json({ error: '모든 필드를 입력해주세요.' }, { status: 400 });
+    // 필수 필드 검증 (reservationId 제거)
+    if (!password || !studentId) {
+      return NextResponse.json({ error: '학번과 비밀번호를 입력해주세요.' }, { status: 400 });
     }
 
     // 유저 인증
@@ -36,18 +36,18 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: '비밀번호가 일치하지 않습니다.' }, { status: 401 });
     }
 
-    // 예약 조회
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: reservationId },
+    // 해당 사용자의 활성 예약 찾기 (하루에 하나만 있음)
+    const reservation = await prisma.reservation.findFirst({
+      where: { 
+        user_id: user.id,
+        status: 'ACTIVE'
+      },
       include: { user: true }
     });
+    
     if (!reservation) {
-      return NextResponse.json({ error: '예약 정보를 찾을 수 없습니다.' }, { status: 404 });
+      return NextResponse.json({ error: '퇴실/취소할 수 있는 활성 예약을 찾을 수 없습니다.' }, { status: 404 });
     }
-    if (reservation.status !== 'ACTIVE') {
-      return NextResponse.json({ error: '활성 상태가 아닌 예약은 퇴실할 수 없습니다.' }, { status: 400 });
-    }
-    // 패스워드 인증으로만 권한 확인 - user_id 검증 제거
 
     const now = dayjs.tz(); // 한국 시간 (로그/저장용)
     const timeOffset = parseInt(process.env.DEV_TIME_OFFSET || '0'); // 개발 편의용
@@ -58,11 +58,12 @@ export async function PATCH(request: NextRequest) {
     // 디버깅용 로그 추가
     console.log('=== 퇴실 요청 디버깅 ===');
     console.log('- 요청한 studentId:', studentId);
-    console.log('- 요청한 reservationId:', reservationId);
     console.log('- 찾은 user.id:', user.id);
+    console.log('- 찾은 예약 ID:', reservation.id);
     console.log('- 예약의 user_id:', reservation.user_id);
     console.log('- 예약 소유자 학번:', reservation.user.studentId);
-    console.log('- 패스워드 인증 완료 - 권한 확인됨');
+    console.log('- 좌석 번호:', reservation.seat_id);
+    console.log('- 패스워드 인증 완료 - 본인 예약 확인됨');
     console.log('현재 시간 정보:');
     console.log('- 실제 서버 시간 (now):', now.format('YYYY-MM-DD HH:mm:ss'));
     console.log('- DEV_TIME_OFFSET:', timeOffset);
@@ -77,7 +78,7 @@ export async function PATCH(request: NextRequest) {
       // 케이스 1: 예약 시간 내에 퇴실
       // 연장된 예약의 경우 endedAt을 변경하지 않고 그대로 유지
       const updated = await prisma.reservation.update({
-        where: { id: reservationId },
+        where: { id: reservation.id },
         data: {
           // endedAt은 변경하지 않음 (연장된 시간 유지)
           checkoutAt: now.toDate(),
@@ -101,7 +102,7 @@ export async function PATCH(request: NextRequest) {
       // 케이스 2: 예약 시간 전에 취소 (예: 14시-16시 예약을 11시에 취소)
       // → 미리 예약 취소
       const updated = await prisma.reservation.update({
-        where: { id: reservationId },
+        where: { id: reservation.id },
         data: {
           checkoutAt: now.toDate(),
           status: 'CANCELLED',
@@ -124,7 +125,7 @@ export async function PATCH(request: NextRequest) {
       // 케이스 3: 예약 시간이 지난 후 처리 (예: 9시-11시 예약을 14시에 처리)
       // → 늦은 취소/정리
       const updated = await prisma.reservation.update({
-        where: { id: reservationId },
+        where: { id: reservation.id },
         data: {
           checkoutAt: now.toDate(),
           status: 'EXPIRED',
