@@ -45,6 +45,7 @@ export default function Home() {
   const [isLoadingReservations, setIsLoadingReservations] = useState(false);
   const [allSeatsStatus, setAllSeatsStatus] = useState<{[key: number]: 'available' | 'occupied' | 'fixed'}>({});
   const [seatRemainingTime, setSeatRemainingTime] = useState<{[key: number]: number}>({});
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { loading } = useAuth();
 
   // 컴포넌트 로드 시 모든 좌석 상태 가져오기
@@ -54,6 +55,14 @@ export default function Home() {
     const interval = setInterval(fetchAllSeatsStatus, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // 모바일 사이드바 상태 변화 추적
+  useEffect(() => {
+    console.log('=== 모바일 사이드바 상태 변화 ===');
+    console.log('- isMobileSidebarOpen:', isMobileSidebarOpen);
+    console.log('- selectedSeat:', selectedSeat);
+    console.log('===============================');
+  }, [isMobileSidebarOpen, selectedSeat]);
 
   // 모든 좌석 상태 가져오기
   const fetchAllSeatsStatus = async () => {
@@ -369,6 +378,218 @@ export default function Home() {
     }
   };
 
+  // 사이드바 컨텐츠 컴포넌트
+  const SidebarContent = () => (
+    <>
+      {selectedSeat ? (
+        <div>
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-lg font-semibold">SCLab 자리 예약 시스템</h1>
+            {/* 모바일에서만 닫기 버튼 표시 */}
+            <button 
+              className="md:hidden p-2 hover:bg-gray-200 rounded-full"
+              onClick={() => {
+                console.log('=== 사이드바 닫기 버튼 클릭 ===');
+                setIsMobileSidebarOpen(false);
+                console.log('- 사이드바 닫기 실행');
+              }}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-4">
+            자리 예약 시 4시간 동안 사용 가능합니다. <br/>
+            (ex : 09:00 선택 시, 12:59 자동 퇴실)<br/>
+            <br/>
+            다음 예약자가 없는 경우 3시간 연장 사용이 가능합니다.
+          </p>
+          <h2 className="text-lg font-semibold mb-4 mt-4">
+            {selectedSeat}번 좌석 예약 현황
+          </h2>
+          
+          {isLoadingReservations ? (
+            <div className="text-center py-8 text-gray-500">
+              예약 정보를 불러오는 중...
+            </div>
+          ) : seatReservations.length > 0 ? (
+            <div className="space-y-3 mb-6">
+              {seatReservations.map((reservation) => {
+                const now = dayjs()
+                const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
+                const currentHour = now.hour() + timeOffset;
+                // 퇴실하지 않은 예약만 "사용 중"으로 표시
+                const isCurrentReservation = !reservation.checkoutAt && 
+                  currentHour >= reservation.startedAt && 
+                  currentHour <= reservation.endedAt;
+                
+                return (
+                  <div key={reservation.id} className={`bg-white p-3 rounded-lg border ${isCurrentReservation ? 'border-green-300 bg-green-50' : ''}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium text-sm">
+                        {reservation.startedAt}:00 - {reservation.endedAt}:59
+                        {isCurrentReservation && (
+                          <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                            사용 중
+                          </span>
+                        )}
+                        {reservation.checkoutAt && (
+                          <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                            퇴실 완료
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {reservation.user.studentId}
+                      </span>
+                    </div>
+                    {reservation.extendedAt && (
+                      <div className="text-xs text-orange-600 mt-1">
+                        연장: {dayjs(reservation.extendedAt).add(timeOffset, 'hour').format('HH시 mm분')}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              예약이 없습니다.
+            </div>
+          )}
+          
+          <div className="mt-8">
+            <button
+              onClick={() => {
+                setModal({ 
+                  isOpen: true, 
+                  seatId: selectedSeat!, 
+                  type: 'reserve',
+                  reservationId: ''
+                });
+                if (selectedSeat) {
+                  fetchSeatReservations(selectedSeat);
+                }
+                setIsMobileSidebarOpen(false); // 모바일에서 모달 열 때 사이드바 닫기
+              }}
+              className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
+              예약하기
+            </button>
+          </div>
+          
+          <div className="space-y-2 mt-6">
+            <button
+              onClick={async () => {
+                // 최신 예약 정보를 가져온 후 현재 사용 중인 예약 찾기
+                if (selectedSeat) {
+                  await fetchSeatReservations(selectedSeat);
+                }
+                
+                // 약간의 지연 후 최신 데이터로 현재 예약 찾기
+                setTimeout(() => {
+                  const now = dayjs();
+                  const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
+                  const currentHour = now.hour() + timeOffset;
+                  
+                  console.log('=== 퇴실 버튼 클릭 디버깅 ===');
+                  console.log('- 현재 시간:', now.format('YYYY-MM-DD HH:mm:ss'));
+                  console.log('- 시간 오프셋:', timeOffset);
+                  console.log('- 계산된 현재 시간:', currentHour);
+                  console.log('- 좌석 예약 목록:', seatReservations);
+                  
+                  // 활성 상태인 예약 중에서 선택 (현재 사용중 또는 미래 예약)
+                  const activeReservations = seatReservations.filter(reservation => 
+                    !reservation.checkoutAt
+                  );
+                  
+                  console.log('- 활성 예약 목록:', activeReservations);
+                  
+                  if (activeReservations.length === 0) {
+                    console.log('- 활성 예약 없음');
+                    console.log('================================');
+                    alert('퇴실/취소할 수 있는 예약을 찾을 수 없습니다.');
+                    return;
+                  }
+                  
+                  // 활성 예약이 있으면 첫 번째 예약을 선택 (패스워드로 권한 확인)
+                  const targetReservation = activeReservations[0];
+                  console.log('- 선택된 예약:', targetReservation);
+                  console.log('- 예약 시간:', `${targetReservation.startedAt}:00 - ${targetReservation.endedAt}:59`);
+                  console.log('- 현재 시간과 비교:', currentHour >= targetReservation.startedAt && currentHour <= targetReservation.endedAt ? '사용중' : '미래/과거 예약');
+                  console.log('================================');
+                  
+                  setModal({ 
+                    isOpen: true, 
+                    seatId: selectedSeat!, 
+                    type: 'checkout',
+                    reservationId: targetReservation.id
+                  });
+                  setIsMobileSidebarOpen(false); // 모바일에서 모달 열 때 사이드바 닫기
+                }, 100);
+              }}
+              className="w-full bg-red-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
+            >
+              퇴실/취소하기
+            </button>
+            <button
+              onClick={async () => {
+                // 최신 예약 정보를 가져온 후 현재 사용 중인 예약 찾기
+                if (selectedSeat) {
+                  await fetchSeatReservations(selectedSeat);
+                }
+                
+                // 약간의 지연 후 최신 데이터로 현재 예약 찾기
+                setTimeout(() => {
+                  const now = dayjs()
+                  const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
+                  const currentHour = now.hour() + timeOffset;
+                  const currentMinute = now.minute();
+                  const currentReservation = seatReservations.find(reservation => 
+                    !reservation.checkoutAt && 
+                    currentHour >= reservation.startedAt && currentHour <= reservation.endedAt
+                  );
+                  
+                  if (currentReservation) {
+                    // 연장 가능 시간 체크
+                    const endTime = currentReservation.endedAt * 60;
+                    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+                    const canExtend = endTime - currentTimeInMinutes <= 20;
+                    
+                    if (canExtend) {
+                      setModal({ 
+                        isOpen: true, 
+                        seatId: selectedSeat!, 
+                        type: 'extend',
+                        reservationId: currentReservation.id
+                      });
+                      setIsMobileSidebarOpen(false); // 모바일에서 모달 열 때 사이드바 닫기
+                    } else {
+                      const remainingMinutes = endTime - currentTimeInMinutes;
+                      const remainingHours = Math.floor(remainingMinutes / 60);
+                      const remainingMins = remainingMinutes % 60;
+                      alert(`연장은 끝나기 20분 전부터 가능합니다. (${remainingHours}시간 ${remainingMins}분 후 가능)`);
+                    }
+                  } else {
+                    alert('현재 사용 중인 예약을 찾을 수 없습니다.');
+                  }
+                }, 100);
+              }}
+              className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-orange-700 transition-colors"
+            >
+              연장하기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8 text-gray-500">
+          좌석을 선택해주세요.
+        </div>
+      )}
+    </>
+  );
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -600,7 +821,7 @@ export default function Home() {
 </Dialog>
     <main className="flex">
       {/* 메인 콘텐츠 영역 */}
-      <div className="flex-1">
+      <div className="flex-1 md:flex-1 w-full">
       <Tabs defaultValue="tab1">
           <TabsList className="fixed right-0 left-0 w-min mx-auto top-8 z-10" variant="solid">
           <TabsTrigger value="tab1">901호</TabsTrigger>
@@ -639,6 +860,11 @@ export default function Home() {
             <button key={i} className={`aspect-square flex flex-col justify-center items-center transition-colors text-xs ${i > 1 && "row-start-2"} ${getSeatColor()}`}
             onClick={() => {
               if (seatStatus === 'fixed') return;
+              console.log('=== 좌석 클릭 ===');
+              console.log('- 좌석 번호:', seatNumber);
+              console.log('- 현재 선택된 좌석:', selectedSeat);
+              console.log('- 모바일 사이드바 상태:', isMobileSidebarOpen);
+              
               setSelectedSeat(seatNumber);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
@@ -646,6 +872,10 @@ export default function Home() {
               setReservationDetails({});
               setSeatReservations([]);
               fetchSeatReservations(seatNumber);
+              setIsMobileSidebarOpen(true); // 모바일에서 사이드바 열기
+              
+              console.log('- 사이드바 열기 실행');
+              console.log('================');
             }}
             >
               <div className="font-medium">{seatNumber}</div>
@@ -686,6 +916,11 @@ export default function Home() {
               if(isFixed) {
                 return;
               }
+              console.log('=== 좌석 클릭 ===');
+              console.log('- 좌석 번호:', seatNumber);
+              console.log('- 현재 선택된 좌석:', selectedSeat);
+              console.log('- 모바일 사이드바 상태:', isMobileSidebarOpen);
+              
               setSelectedSeat(seatNumber);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
@@ -693,6 +928,10 @@ export default function Home() {
               setReservationDetails({});
               setSeatReservations([]);
               fetchSeatReservations(seatNumber);
+              setIsMobileSidebarOpen(true); // 모바일에서 사이드바 열기
+              
+              console.log('- 사이드바 열기 실행');
+              console.log('================');
             }}>
               <div className="font-medium">{text}</div>
               {seatStatus === 'occupied' && remainingMinutes > 0 && !isFixed && (
@@ -731,6 +970,11 @@ export default function Home() {
               if(isFixed) {
                 return;
               }
+              console.log('=== 좌석 클릭 (9-13번) ===');
+              console.log('- 좌석 번호:', seatNumber);
+              console.log('- 현재 선택된 좌석:', selectedSeat);
+              console.log('- 모바일 사이드바 상태:', isMobileSidebarOpen);
+              
               setSelectedSeat(seatNumber);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
@@ -738,6 +982,10 @@ export default function Home() {
               setReservationDetails({});
               setSeatReservations([]);
               fetchSeatReservations(seatNumber);
+              setIsMobileSidebarOpen(true); // 모바일에서 사이드바 열기
+              
+              console.log('- 사이드바 열기 실행');
+              console.log('========================');
             }}>
               <div className="font-medium">{text}</div>
               {seatStatus === 'occupied' && remainingMinutes > 0 && !isFixed && (
@@ -784,6 +1032,11 @@ export default function Home() {
               if(isFixed) {
                 return;
               }
+              console.log('=== 좌석 클릭 ===');
+              console.log('- 좌석 번호:', seatNumber);
+              console.log('- 현재 선택된 좌석:', selectedSeat);
+              console.log('- 모바일 사이드바 상태:', isMobileSidebarOpen);
+              
               setSelectedSeat(seatNumber);
               setSelectedTimes([]);
               setReservationForm({ studentId: '', password: '' });
@@ -791,6 +1044,10 @@ export default function Home() {
               setReservationDetails({});
               setSeatReservations([]);
               fetchSeatReservations(seatNumber);
+              setIsMobileSidebarOpen(true); // 모바일에서 사이드바 열기
+              
+              console.log('- 사이드바 열기 실행');
+              console.log('================');
             }}
             >
               <div className="font-medium">{text}</div>
@@ -805,208 +1062,32 @@ export default function Home() {
   </Tabs>
       </div>
 
-      {/* 사이드바 */}
-      <div className="w-80 bg-gray-50 border-l border-gray-200 p-4 min-h-screen">
-        {selectedSeat ? (
-          <div>
-            <h1 className="text-lg font-semibold mb-4">SCLab 자리 예약 시스템</h1>
-            <p className="text-xs text-gray-500 mb-4">
-              자리 예약 시 4시간 동안 사용 가능합니다. <br/>
-              (ex : 09:00 선택 시, 12:59 자동 퇴실)<br/>
-              <br/>
-              다음 예약자가 없는 경우 3시간 연장 사용이 가능합니다.
-            </p>
-            <h2 className="text-lg font-semibold mb-4 mt-4">
-              {selectedSeat}번 좌석 예약 현황
-            </h2>
-            
-            {isLoadingReservations ? (
-              <div className="text-center py-8 text-gray-500">
-                예약 정보를 불러오는 중...
-              </div>
-            ) : seatReservations.length > 0 ? (
-              <div className="space-y-3 mb-6">
-                {seatReservations.map((reservation) => {
-                  const now = dayjs()
-                  const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
-                  const currentHour = now.hour() + timeOffset;
-                  // 퇴실하지 않은 예약만 "사용 중"으로 표시
-                  const isCurrentReservation = !reservation.checkoutAt && 
-                    currentHour >= reservation.startedAt && 
-                    currentHour <= reservation.endedAt;
-                  
-                  return (
-                    <div key={reservation.id} className={`bg-white p-3 rounded-lg border ${isCurrentReservation ? 'border-green-300 bg-green-50' : ''}`}>
-                      <div className="flex justify-between items-center">
-                        <span className="font-medium text-sm">
-                          {reservation.startedAt}:00 - {reservation.endedAt}:59
-                          {isCurrentReservation && (
-                            <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                              사용 중
-                            </span>
-                          )}
-                          {reservation.checkoutAt && (
-                            <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                              퇴실 완료
-                            </span>
-                          )}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {reservation.user.studentId}
-                        </span>
-                      </div>
-                      {reservation.extendedAt && (
-                        <div className="text-xs text-orange-600 mt-1">
-                          연장: {dayjs(reservation.extendedAt).add(timeOffset, 'hour').format('HH시 mm분')}
-                        </div>
-                      )}
-                      {/* {reservation.checkoutAt && (
-                        <div className="text-xs text-green-600 mt-1">
-                          퇴실: {new Date(reservation.checkoutAt).toLocaleTimeString()}
-                        </div>
-                      )}
-                      {reservation.extendedCount && (reservation.extendedCount > 0) && (
-                        <div className="text-xs text-blue-600 mt-1">
-                          연장 횟수: {reservation.extendedCount}회
-                        </div>
-                      )} */}
-                      
+      {/* 데스크톱 사이드바 */}
+      <div className="hidden md:block w-80 bg-gray-50 border-l border-gray-200 p-4 min-h-screen">
+        <SidebarContent />
+      </div>
 
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                예약이 없습니다.
-              </div>
-            )}
-            
-            <div className="mt-8">
-              <button
-                onClick={() => {
-                  setModal({ 
-                    isOpen: true, 
-                    seatId: selectedSeat!, 
-                    type: 'reserve',
-                    reservationId: ''
-                  });
-                  if (selectedSeat) {
-                    fetchSeatReservations(selectedSeat);
-                  }
-                }}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 transition-colors"
-              >
-                예약하기
-              </button>
-            </div>
-            
-            <div className="space-y-2 mt-6">
-              <button
-                onClick={async () => {
-                  // 최신 예약 정보를 가져온 후 현재 사용 중인 예약 찾기
-                  if (selectedSeat) {
-                    await fetchSeatReservations(selectedSeat);
-                  }
-                  
-                  // 약간의 지연 후 최신 데이터로 현재 예약 찾기
-                  setTimeout(() => {
-                    const now = dayjs();
-                    const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
-                    const currentHour = now.hour() + timeOffset;
-                    
-                    console.log('=== 퇴실 버튼 클릭 디버깅 ===');
-                    console.log('- 현재 시간:', now.format('YYYY-MM-DD HH:mm:ss'));
-                    console.log('- 시간 오프셋:', timeOffset);
-                    console.log('- 계산된 현재 시간:', currentHour);
-                    console.log('- 좌석 예약 목록:', seatReservations);
-                    
-                    // 활성 상태인 예약 중에서 선택 (현재 사용중 또는 미래 예약)
-                    const activeReservations = seatReservations.filter(reservation => 
-                      !reservation.checkoutAt
-                    );
-                    
-                    console.log('- 활성 예약 목록:', activeReservations);
-                    
-                    if (activeReservations.length === 0) {
-                      console.log('- 활성 예약 없음');
-                      console.log('================================');
-                      alert('퇴실/취소할 수 있는 예약을 찾을 수 없습니다.');
-                      return;
-                    }
-                    
-                    // 활성 예약이 있으면 첫 번째 예약을 선택 (패스워드로 권한 확인)
-                    const targetReservation = activeReservations[0];
-                    console.log('- 선택된 예약:', targetReservation);
-                    console.log('- 예약 시간:', `${targetReservation.startedAt}:00 - ${targetReservation.endedAt}:59`);
-                    console.log('- 현재 시간과 비교:', currentHour >= targetReservation.startedAt && currentHour <= targetReservation.endedAt ? '사용중' : '미래/과거 예약');
-                    console.log('================================');
-                    
-                    setModal({ 
-                      isOpen: true, 
-                      seatId: selectedSeat!, 
-                      type: 'checkout',
-                      reservationId: targetReservation.id
-                    });
-                  }, 100);
-                }}
-                className="w-full bg-red-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-red-700 transition-colors"
-              >
-                퇴실/취소하기
-              </button>
-              <button
-                onClick={async () => {
-                  // 최신 예약 정보를 가져온 후 현재 사용 중인 예약 찾기
-                  if (selectedSeat) {
-                    await fetchSeatReservations(selectedSeat);
-                  }
-                  
-                  // 약간의 지연 후 최신 데이터로 현재 예약 찾기
-                  setTimeout(() => {
-                    const now = dayjs()
-                    const timeOffset = parseInt(process.env.NEXT_PUBLIC_DEV_TIME_OFFSET || '0');
-                    const currentHour = now.hour() + timeOffset;
-                    const currentMinute = now.minute();
-                    const currentReservation = seatReservations.find(reservation => 
-                      !reservation.checkoutAt && 
-                      currentHour >= reservation.startedAt && currentHour <= reservation.endedAt
-                    );
-                    
-                    if (currentReservation) {
-                      // 연장 가능 시간 체크
-                      const endTime = currentReservation.endedAt * 60;
-                      const currentTimeInMinutes = currentHour * 60 + currentMinute;
-                      const canExtend = endTime - currentTimeInMinutes <= 20;
-                      
-                      if (canExtend) {
-                        setModal({ 
-                          isOpen: true, 
-                          seatId: selectedSeat!, 
-                          type: 'extend',
-                          reservationId: currentReservation.id
-                        });
-                      } else {
-                        const remainingMinutes = endTime - currentTimeInMinutes;
-                        const remainingHours = Math.floor(remainingMinutes / 60);
-                        const remainingMins = remainingMinutes % 60;
-                        alert(`연장은 끝나기 20분 전부터 가능합니다. (${remainingHours}시간 ${remainingMins}분 후 가능)`);
-                      }
-                    } else {
-                      alert('현재 사용 중인 예약을 찾을 수 없습니다.');
-                    }
-                  }, 100);
-                }}
-                className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-orange-700 transition-colors"
-              >
-                연장하기
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            좌석을 선택해주세요.
-          </div>
-        )}
+      {/* 모바일 오버레이 */}
+      {isMobileSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          onClick={() => {
+            console.log('=== 오버레이 클릭 ===');
+            setIsMobileSidebarOpen(false);
+            console.log('- 사이드바 닫기 실행');
+          }}
+        />
+      )}
+
+      {/* 모바일 슬라이드 사이드바 */}
+      <div className={`md:hidden fixed top-0 right-0 h-full w-80 bg-gray-50 shadow-xl z-50 transform transition-transform duration-300 ease-in-out ${
+        isMobileSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+      }`}>
+        {/* 디버깅용 표시 */}
+
+        <div className="p-4 h-full overflow-y-auto">
+          <SidebarContent />
+        </div>
       </div>
     </main>
     
